@@ -327,6 +327,11 @@ body::before{content:'';position:fixed;top:0;left:0;right:0;height:8px;backgroun
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 'use strict';
+/* ================= 账本配置（改这里就行） ================= */
+const USE_PASSWORD = false;                      // true=需要密码进入；false=不用密码，打开直接进账本
+const FIXED_PASSWORD = '030200';                // 固定密码（仅 USE_PASSWORD=true 时生效）
+const FIXED_LEDGER_CODE = 'qiqi-ganggang-2026'; // 固定账本ID，云端数据都存这一个下面
+/* ======================================================== */
 const CATS=[
   {id:'food',name:'餐饮',emoji:'🍜',color:'#ff9f68'},
   {id:'traffic',name:'交通',emoji:'🚌',color:'#6ec6ff'},
@@ -358,8 +363,6 @@ const CHEERS=[
 ];
 const LS_KEY='cuteLedger_v1';
 const LS_CODE='cuteLedger_online_code';
-const FIXED_PASSWORD='030200';                 // ← 固定密码（改成你们自己的）
-const FIXED_LEDGER_CODE='qiqi-ganggang-2026';  // ← 固定账本ID，云端数据都存这一个下面
 const SUPABASE_URL='https://xoxqiuyiikqywuexhqgy.supabase.co';
 const SUPABASE_ANON_KEY='sb_publishable_YTT3-_WjTAej2eUGBNVkAA_0WQasRnR';
 function fetchWithTimeout(url,opts){
@@ -1087,6 +1090,13 @@ el('switchBtn').addEventListener('click',()=>{
   }
 });
 (function start(){
+  if(!USE_PASSWORD){
+    el('switchBtn').style.display='none';
+    ledgerCode=FIXED_LEDGER_CODE;
+    hideGate();
+    bootstrap();
+    return;
+  }
   if(storage.get(LS_CODE)==='ok'){ ledgerCode=FIXED_LEDGER_CODE; hideGate(); bootstrap(); }
   else showGate();
 })();
