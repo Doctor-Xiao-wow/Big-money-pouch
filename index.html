@@ -163,8 +163,8 @@ body::before{content:'';position:fixed;top:0;left:0;right:0;height:8px;backgroun
 <div id="gate" class="gate">
   <div class="gate-box">
     <div class="gate-title">🍓 小钱袋 · 线上版</div>
-    <div class="gate-sub">输入你们的共享账本口令进入（两个人用同一个口令，数据实时同步）</div>
-    <input type="text" id="codeInput" placeholder="账本口令，如 gang-love-qiqi-2026" autocomplete="off">
+    <div class="gate-sub">输入固定密码进入（密码存在文件里，两个人用同一个）</div>
+    <input type="password" id="codeInput" placeholder="请输入密码" autocomplete="off">
     <button id="enterBtn">进入账本 →</button>
     <div class="gate-err" id="gateErr"></div>
   </div>
@@ -317,9 +317,9 @@ body::before{content:'';position:fixed;top:0;left:0;right:0;height:8px;backgroun
     <button id="exportBtn">📦 导出数据</button>
     <button id="importBtn">📥 导入数据</button>
     <button id="clearBtn">🧹 清空数据</button>
-    <button id="switchBtn">🔑 切换账本</button>
+    <button id="switchBtn">🔒 锁定</button>
     <input type="file" id="importInput" accept=".json" hidden>
-    <div class="note">数据实时同步到云端，两人各用各的设备记，账目自动合并；口令请保密哦～ 换设备不丢数据，仍建议定期「导出数据」备份</div>
+    <div class="note">数据实时同步到云端，两人各用各的设备记，账目自动合并；密码请保密哦～ 换设备不丢数据，仍建议定期「导出数据」备份</div>
   </footer>
 </div>
 <div id="toast"></div>
@@ -358,6 +358,8 @@ const CHEERS=[
 ];
 const LS_KEY='cuteLedger_v1';
 const LS_CODE='cuteLedger_online_code';
+const FIXED_PASSWORD='030200';                 // ← 固定密码（改成你们自己的）
+const FIXED_LEDGER_CODE='qiqi-ganggang-2026';  // ← 固定账本ID，云端数据都存这一个下面
 const SUPABASE_URL='https://xoxqiuyiikqywuexhqgy.supabase.co';
 const SUPABASE_ANON_KEY='sb_publishable_YTT3-_WjTAej2eUGBNVkAA_0WQasRnR';
 function fetchWithTimeout(url,opts){
@@ -1066,10 +1068,11 @@ function setupRealtime(){
 }
 async function refreshQuiet(){ try{ await loadFromServer(); renderAll(); }catch(e){} }
 el('enterBtn').addEventListener('click',async()=>{
-  const code=el('codeInput').value.trim();
-  if(!code){ el('gateErr').textContent='请输入账本口令'; return; }
-  ledgerCode=code;
-  storage.set(LS_CODE,code);
+  const pwd=el('codeInput').value.trim();
+  if(!pwd){ el('gateErr').textContent='请输入密码'; return; }
+  if(pwd!==FIXED_PASSWORD){ el('gateErr').textContent='密码不对哦，再试一次'; return; }
+  ledgerCode=FIXED_LEDGER_CODE;
+  storage.set(LS_CODE,'ok');
   el('gateErr').textContent='';
   const btn=el('enterBtn');
   btn.disabled=true; btn.textContent='正在进入…';
@@ -1078,14 +1081,13 @@ el('enterBtn').addEventListener('click',async()=>{
 });
 el('codeInput').addEventListener('keydown',e=>{ if(e.key==='Enter') el('enterBtn').click(); });
 el('switchBtn').addEventListener('click',()=>{
-  if(confirm('要切换账本吗？（云端数据不会丢，之后可用口令回来）')){
+  if(confirm('要锁定吗？（下次打开需要重新输入密码，云端数据不会丢）')){
     storage.remove(LS_CODE);
     location.reload();
   }
 });
 (function start(){
-  const saved=storage.get(LS_CODE);
-  if(saved){ ledgerCode=saved; hideGate(); bootstrap(); }
+  if(storage.get(LS_CODE)==='ok'){ ledgerCode=FIXED_LEDGER_CODE; hideGate(); bootstrap(); }
   else showGate();
 })();
 </script>
