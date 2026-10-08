@@ -149,7 +149,7 @@ body::before{content:'';position:fixed;top:0;left:0;right:0;height:8px;backgroun
 .title{display:flex;align-items:center;gap:8px}
 .title svg{width:30px;height:30px;flex-shrink:0}
 @keyframes floaty{0%,100%{transform:translateY(0) rotate(-6deg)}50%{transform:translateY(-26px) rotate(8deg)}}
-.gate{position:fixed;inset:0;background:linear-gradient(160deg,var(--bg1),var(--bg2) 60%,#fff);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px}
+.gate{position:fixed;inset:0;background:linear-gradient(160deg,var(--bg1),var(--bg2) 60%,#fff);display:none;align-items:center;justify-content:center;z-index:50;padding:20px}
 .gate-box{background:#fff;border-radius:24px;padding:32px 28px;max-width:400px;width:100%;box-shadow:0 12px 40px rgba(180,120,150,.18);text-align:center}
 .gate-title{font-size:24px;font-weight:800;color:var(--accent);margin-bottom:6px}
 .gate-sub{font-size:13px;color:var(--muted);margin-bottom:18px;line-height:1.6}
@@ -1038,8 +1038,8 @@ function showGate(){ el('gate').style.display='flex'; }
 function hideGate(){ el('gate').style.display='none'; }
 async function bootstrap(){
   if(!supabase){
-    showGate();
-    el('gateErr').textContent='Supabase 组件没加载成功：请检查网络能否访问 cdn.jsdelivr.net，然后刷新重试';
+    console.error('Supabase 组件没加载');
+    if(USE_PASSWORD){ showGate(); el('gateErr').textContent='Supabase 组件没加载成功：请检查网络能否访问 cdn.jsdelivr.net，然后刷新重试'; }
     return;
   }
   try{
@@ -1050,15 +1050,17 @@ async function bootstrap(){
     setupRealtime();
   }catch(err){
     console.error(err);
-    showGate();
     const m=String((err&&err.message)||err||'');
+    let msg;
     if(/does not exist|relation|42P01|Could not find/i.test(m)){
-      el('gateErr').textContent='数据表还没建好：请到 Supabase 控制台 → SQL Editor 运行 supabase-setup.sql，再回来试';
+      msg='数据表还没建好：请到 Supabase 控制台 → SQL Editor 运行 supabase-setup.sql，再回来试';
     }else if(/fetch|network|abort|timed out|ECONN|Failed to/i.test(m)){
-      el('gateErr').textContent='连不上云端服务器：请检查网络；若项目刚建，确认没有被 Supabase 暂停（Paused）';
+      msg='连不上云端服务器：请检查网络；若项目刚建，确认没有被 Supabase 暂停（Paused）';
     }else{
-      el('gateErr').textContent='加载失败：'+m;
+      msg='加载失败：'+m;
     }
+    if(USE_PASSWORD){ showGate(); el('gateErr').textContent=msg; }
+    else { toast(msg,'⚠️'); }
   }
 }
 function setupRealtime(){
