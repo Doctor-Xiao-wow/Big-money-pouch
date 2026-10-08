@@ -149,9 +149,26 @@ body::before{content:'';position:fixed;top:0;left:0;right:0;height:8px;backgroun
 .title{display:flex;align-items:center;gap:8px}
 .title svg{width:30px;height:30px;flex-shrink:0}
 @keyframes floaty{0%,100%{transform:translateY(0) rotate(-6deg)}50%{transform:translateY(-26px) rotate(8deg)}}
+.gate{position:fixed;inset:0;background:linear-gradient(160deg,var(--bg1),var(--bg2) 60%,#fff);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px}
+.gate-box{background:#fff;border-radius:24px;padding:32px 28px;max-width:400px;width:100%;box-shadow:0 12px 40px rgba(180,120,150,.18);text-align:center}
+.gate-title{font-size:24px;font-weight:800;color:var(--accent);margin-bottom:6px}
+.gate-sub{font-size:13px;color:var(--muted);margin-bottom:18px;line-height:1.6}
+.gate-box input{width:100%;padding:13px 16px;border:2px solid var(--accent-soft);border-radius:14px;font-size:15px;outline:none;font-family:inherit;color:var(--text);margin-bottom:12px;text-align:center}
+.gate-box input:focus{border-color:var(--accent)}
+.gate-box button{width:100%;padding:13px;border:none;border-radius:16px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit}
+.gate-err{color:var(--danger);font-size:13px;margin-top:10px;min-height:18px}
 </style>
 </head>
 <body>
+<div id="gate" class="gate">
+  <div class="gate-box">
+    <div class="gate-title">🍓 小钱袋 · 线上版</div>
+    <div class="gate-sub">输入你们的共享账本口令进入（两个人用同一个口令，数据实时同步）</div>
+    <input type="text" id="codeInput" placeholder="账本口令，如 gang-love-qiqi-2026" autocomplete="off">
+    <button id="enterBtn">进入账本 →</button>
+    <div class="gate-err" id="gateErr"></div>
+  </div>
+</div>
 <svg width="0" height="0" style="position:absolute"><symbol id="kitty" viewBox="0 0 200 200">
   <path d="M40 50 L30 8 L72 28 Z" fill="#ffffff" stroke="#e8c7d0" stroke-width="3" stroke-linejoin="round"/>
   <path d="M160 50 L170 8 L128 28 Z" fill="#ffffff" stroke="#e8c7d0" stroke-width="3" stroke-linejoin="round"/>
@@ -300,12 +317,14 @@ body::before{content:'';position:fixed;top:0;left:0;right:0;height:8px;backgroun
     <button id="exportBtn">📦 导出数据</button>
     <button id="importBtn">📥 导入数据</button>
     <button id="clearBtn">🧹 清空数据</button>
+    <button id="switchBtn">🔑 切换账本</button>
     <input type="file" id="importInput" accept=".json" hidden>
-    <div class="note">数据保存在本浏览器里（同一台电脑上切换头像即可两人一起记账）；换浏览器或换设备前记得先「导出数据」备份哦～</div>
+    <div class="note">数据实时同步到云端，两人各用各的设备记，账目自动合并；口令请保密哦～ 换设备不丢数据，仍建议定期「导出数据」备份</div>
   </footer>
 </div>
 <div id="toast"></div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 'use strict';
 const CATS=[
@@ -338,6 +357,25 @@ const CHEERS=[
   '加油，把每一分钱花在喜欢的事情上～'
 ];
 const LS_KEY='cuteLedger_v1';
+const LS_CODE='cuteLedger_online_code';
+const SUPABASE_URL='https://xoxqiuyiikqywuexhqgy.supabase.co';
+const SUPABASE_ANON_KEY='sb_publishable_YTT3-_WjTAej2eUGBNVkAA_0WQasRnR';
+function fetchWithTimeout(url,opts){
+  opts=opts||{};
+  const ctrl=('AbortController' in window)?new AbortController():null;
+  if(ctrl&&!opts.signal){
+    opts.signal=ctrl.signal;
+    const t=setTimeout(()=>ctrl.abort(),15000);
+    return fetch(url,opts).finally(()=>clearTimeout(t));
+  }
+  return fetch(url,opts);
+}
+const storage={
+  get(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } },
+  set(k,v){ try{ localStorage.setItem(k,v); }catch(e){} },
+  remove(k){ try{ localStorage.removeItem(k); }catch(e){} }
+};
+const supabase=(window.supabase&&SUPABASE_URL.indexOf('YOUR_')<0)?window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY,{global:{fetch:fetchWithTimeout}}):null;
 const el=id=>document.getElementById(id);
 const pad=n=>String(n).padStart(2,'0');
 const dkey=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
@@ -353,7 +391,8 @@ function fmtCompact(n){
 function esc(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function round100(n){ return Math.max(100,Math.round(n/100)*100); }
 
-let state=loadState();
+let state={qiqi:{records:[],budgets:{}},ganggang:{records:[],budgets:{}}};
+let ledgerCode=null;
 let currentUser='qiqi';
 let viewMode='month';
 let recordsMonth=mkey(new Date());
@@ -364,15 +403,23 @@ let inputType='expense';
 let editing=null;
 let distType='expense';
 
-function loadState(){
-  try{
-    const raw=localStorage.getItem(LS_KEY);
-    if(raw){
-      const s=JSON.parse(raw);
-      if(s&&s.qiqi&&s.ganggang) return sanitize(s);
-    }
-  }catch(e){}
-  return {qiqi:{records:[],budgets:{}},ganggang:{records:[],budgets:{}}};
+async function loadFromServer(){
+  const [rr,br]=await Promise.all([
+    supabase.from('records').select('*').eq('ledger_code',ledgerCode),
+    supabase.from('budgets').select('*').eq('ledger_code',ledgerCode)
+  ]);
+  if(rr.error) throw rr.error;
+  if(br.error) throw br.error;
+  const s={qiqi:{records:[],budgets:{}},ganggang:{records:[],budgets:{}}};
+  (rr.data||[]).forEach(r=>{
+    const u=s[r.uid==='ganggang'?'ganggang':'qiqi'];
+    u.records.push({id:String(r.id),amount:Number(r.amount),cat:r.cat,type:r.type,date:r.date,time:String(r.time||''),note:String(r.note||''),ts:Number(r.ts)});
+  });
+  (br.data||[]).forEach(b=>{
+    const u=s[b.uid==='ganggang'?'ganggang':'qiqi'];
+    u.budgets[b.month]=Number(b.amount);
+  });
+  state=sanitize(s);
 }
 function sanitize(s){
   const fix=u=>{
@@ -394,7 +441,18 @@ function sanitize(s){
   fix(s.qiqi); fix(s.ganggang);
   return s;
 }
-function saveState(){ try{ localStorage.setItem(LS_KEY,JSON.stringify(state)); }catch(e){} }
+async function setBudget(uid,mk,amount){
+  const {error}=await supabase.from('budgets').upsert({ledger_code:ledgerCode,uid:uid,month:mk,amount:amount});
+  if(error) throw error;
+}
+async function clearBudget(uid,mk){
+  const {error}=await supabase.from('budgets').delete().eq('ledger_code',ledgerCode).eq('uid',uid).eq('month',mk);
+  if(error) throw error;
+}
+async function clearAll(){
+  await supabase.from('records').delete().eq('ledger_code',ledgerCode);
+  await supabase.from('budgets').delete().eq('ledger_code',ledgerCode);
+}
 
 function userRecords(uid){
   if(uid==='both') return [
@@ -423,10 +481,12 @@ function getBudget(uid,mk){
   if(uid==='both') return (state.qiqi.budgets[mk]||0)+(state.ganggang.budgets[mk]||0);
   return state[uid].budgets[mk]||0;
 }
-function addRecord(uid,amount,cat,dateStr,type,note){
+async function addRecord(uid,amount,cat,dateStr,type,note){
   const now=new Date();
-  state[uid].records.push({
+  const row={
     id:Date.now()+'-'+Math.random().toString(36).slice(2,7),
+    ledger_code:ledgerCode,
+    uid:uid,
     amount:Math.round(amount*100)/100,
     cat:CAT_MAP[cat]?cat:(type==='income'?'other_income':'other'),
     type:type==='income'?'income':'expense',
@@ -434,13 +494,17 @@ function addRecord(uid,amount,cat,dateStr,type,note){
     time:pad(now.getHours())+':'+pad(now.getMinutes()),
     note:String(note||'').trim().slice(0,50),
     ts:Date.now()
-  });
-  saveState();
+  };
+  const {error}=await supabase.from('records').insert(row);
+  if(error) throw error;
 }
-function deleteRecord(uid,id){
-  const arr=state[uid].records;
-  const i=arr.findIndex(r=>String(r.id)===String(id));
-  if(i>-1){ arr.splice(i,1); saveState(); }
+async function deleteRecord(uid,id){
+  const {error}=await supabase.from('records').delete().eq('id',String(id)).eq('ledger_code',ledgerCode);
+  if(error) throw error;
+}
+async function updateRecord(uid,id,patch){
+  const {error}=await supabase.from('records').update(patch).eq('id',String(id)).eq('ledger_code',ledgerCode);
+  if(error) throw error;
 }
 function startEdit(uid,id){
   const r=state[uid].records.find(x=>String(x.id)===String(id));
@@ -732,11 +796,13 @@ function renderAdvice(){
     +(currentUser==='both'?'':'<div style="margin-top:12px"><button class="btn-secondary" id="applyBudget">🎯 应用到 '+nmLabel+' 预算</button></div>')
     +'<div class="advice-cheer">'+a.cheer+'</div>';
   const ab=el('applyBudget');
-  if(ab) ab.addEventListener('click',()=>{
-    state[currentUser].budgets[mkey(nm)]=a.suggested;
-    saveState();
-    renderAll();
-    toast(nmLabel+' 预算已设为 ¥'+fmt(a.suggested),'🎯');
+  if(ab) ab.addEventListener('click',async()=>{
+    try{
+      await setBudget(currentUser,mkey(nm),a.suggested);
+      await loadFromServer();
+      renderAll();
+      toast(nmLabel+' 预算已设为 ¥'+fmt(a.suggested),'🎯');
+    }catch(e){ console.error(e); toast('保存失败，请检查网络','⚠️'); }
   });
 }
 
@@ -786,12 +852,15 @@ function renderRecords(){
   document.querySelectorAll('#recList .rec-row').forEach(row=>{
     row.addEventListener('click',()=>startEdit(row.dataset.uid,row.dataset.id));
   });
-  document.querySelectorAll('#recList .rec-del').forEach(b=>b.addEventListener('click',e=>{
+  document.querySelectorAll('#recList .rec-del').forEach(b=>b.addEventListener('click',async e=>{
     e.stopPropagation();
     if(confirm('要删掉这笔记录吗？')){
-      deleteRecord(b.dataset.uid,b.dataset.id);
-      renderAll();
-      toast('已删除','🗑️');
+      try{
+        await deleteRecord(b.dataset.uid,b.dataset.id);
+        await loadFromServer();
+        renderAll();
+        toast('已删除','🗑️');
+      }catch(err){ console.error(err); toast('删除失败，请检查网络','⚠️'); }
     }
   }));
 }
@@ -813,6 +882,7 @@ function renderAll(){
   renderAdvice();
   renderBudget();
   renderRecords();
+  if(editing){ el('addBtn').textContent='保存修改 ✨'; el('editCancel').style.display='inline-block'; }
 }
 
 function updateClock(){
@@ -820,11 +890,13 @@ function updateClock(){
   el('nowTime').textContent=pad(n.getHours())+':'+pad(n.getMinutes())+':'+pad(n.getSeconds());
 }
 
+let initialized=false;
 function init(){
+  if(initialized) return;
+  initialized=true;
   el('dateInput').value=dkey(new Date());
   el('dateInput').max=dkey(new Date());
   setBodyTheme();
-  renderAll();
   updateClock();
   setInterval(updateClock,1000);
 
@@ -852,24 +924,25 @@ function init(){
     renderCatGrid();
   }));
 
-  el('addBtn').addEventListener('click',()=>{
+  el('addBtn').addEventListener('click',async()=>{
     if(editing){
       const amt=parseFloat(el('amountInput').value);
       if(!(amt>0)){ toast('先填一个正确的金额哦','🙈'); return; }
       const date=el('dateInput').value||dkey(new Date());
       const note=el('noteInput').value.trim();
-      const r=state[editing.uid].records.find(x=>String(x.id)===String(editing.id));
-      if(r){
-        r.amount=Math.round(amt*100)/100;
-        r.cat=CAT_MAP[selectedCat]?selectedCat:(inputType==='income'?'other_income':'other');
-        r.type=inputType==='income'?'income':'expense';
-        r.date=date;
-        r.note=String(note).slice(0,50);
-        saveState();
+      try{
+        await updateRecord(editing.uid,editing.id,{
+          amount:Math.round(amt*100)/100,
+          cat:CAT_MAP[selectedCat]?selectedCat:(inputType==='income'?'other_income':'other'),
+          type:inputType==='income'?'income':'expense',
+          date:date,
+          note:String(note).slice(0,50)
+        });
+        cancelEdit();
+        await loadFromServer();
+        renderAll();
         toast('修改好啦','✏️');
-      }
-      cancelEdit();
-      renderAll();
+      }catch(e){ console.error(e); toast('保存失败，请检查网络','⚠️'); }
       return;
     }
     if(currentUser==='both'){ toast('请先切换到小齐齐或大刚刚再记账哦','🙈'); return; }
@@ -877,24 +950,29 @@ function init(){
     if(!(amt>0)){ toast('先填一个正确的金额哦','🙈'); return; }
     const date=el('dateInput').value||dkey(new Date());
     const note=el('noteInput').value.trim();
-    addRecord(currentUser,amt,selectedCat,date,inputType,note);
-    el('amountInput').value='';
-    el('noteInput').value='';
-    renderAll();
-    if(inputType==='income') toast('收入记好啦！'+CAT_MAP[selectedCat].emoji+' +¥'+fmt(amt),'✅');
-    else toast('记好啦！'+CAT_MAP[selectedCat].emoji+' ¥'+fmt(amt),'✅');
+    try{
+      await addRecord(currentUser,amt,selectedCat,date,inputType,note);
+      el('amountInput').value='';
+      el('noteInput').value='';
+      await loadFromServer();
+      renderAll();
+      if(inputType==='income') toast('收入记好啦！'+CAT_MAP[selectedCat].emoji+' +¥'+fmt(amt),'✅');
+      else toast('记好啦！'+CAT_MAP[selectedCat].emoji+' ¥'+fmt(amt),'✅');
+    }catch(e){ console.error(e); toast('保存失败，请检查网络','⚠️'); }
   });
   el('editCancel').addEventListener('click',cancelEdit);
   el('amountInput').addEventListener('keydown',e=>{ if(e.key==='Enter') el('addBtn').click(); });
 
-  el('budgetBtn').addEventListener('click',()=>{
+  el('budgetBtn').addEventListener('click',async()=>{
     if(currentUser==='both') return;
     const v=parseFloat(el('budgetInput').value);
     if(!(v>=0)){ toast('请输入正确的预算金额','🙈'); return; }
-    if(v===0){ delete state[currentUser].budgets[budgetMonth]; toast('已清除该月预算','🧹'); }
-    else{ state[currentUser].budgets[budgetMonth]=Math.round(v*100)/100; toast(budgetMonth.replace('-','年')+'月 预算已保存','🎯'); }
-    saveState();
-    renderAll();
+    try{
+      if(v===0){ await clearBudget(currentUser,budgetMonth); toast('已清除该月预算','🧹'); }
+      else{ await setBudget(currentUser,budgetMonth,Math.round(v*100)/100); toast(budgetMonth.replace('-','年')+'月 预算已保存','🎯'); }
+      await loadFromServer();
+      renderAll();
+    }catch(e){ console.error(e); toast('保存失败，请检查网络','⚠️'); }
   });
 
   el('prevMonth').addEventListener('click',()=>{ recordsMonth=shiftMonthKey(recordsMonth,-1); renderRecords(); });
@@ -918,30 +996,98 @@ function init(){
     const f=e.target.files[0];
     if(!f) return;
     const r=new FileReader();
-    r.onload=()=>{
+    r.onload=async()=>{
       try{
         const s=JSON.parse(r.result);
         if(s&&s.qiqi&&s.ganggang){
           if(!confirm('导入会覆盖当前所有数据，确定吗？')) return;
-          state=sanitize(s);
-          saveState();
+          await clearAll();
+          const clean=sanitize(s);
+          const recRows=[],budRows=[];
+          ['qiqi','ganggang'].forEach(uid=>{
+            clean[uid].records.forEach(x=>recRows.push({id:String(x.id),ledger_code:ledgerCode,uid:uid,amount:x.amount,cat:x.cat,type:x.type,date:x.date,time:x.time||'',note:x.note||'',ts:x.ts}));
+            Object.keys(clean[uid].budgets).forEach(mk=>budRows.push({ledger_code:ledgerCode,uid:uid,month:mk,amount:clean[uid].budgets[mk]}));
+          });
+          if(recRows.length) await supabase.from('records').insert(recRows);
+          if(budRows.length) await supabase.from('budgets').insert(budRows);
+          await loadFromServer();
           renderAll();
           toast('导入成功','📥');
         }else{ toast('文件格式不对哦','🙈'); }
-      }catch(err){ toast('文件解析失败','🙈'); }
+      }catch(err){ console.error(err); toast('文件解析或上传失败','🙈'); }
     };
     r.readAsText(f);
   });
-  el('clearBtn').addEventListener('click',()=>{
+  el('clearBtn').addEventListener('click',async()=>{
     if(!confirm('确定要清空所有记账数据吗？')) return;
     if(!confirm('再确认一次：清空后无法恢复哦！')) return;
-    state={qiqi:{records:[],budgets:{}},ganggang:{records:[],budgets:{}}};
-    saveState();
-    renderAll();
-    toast('已清空，重新开始吧','🧹');
+    try{
+      await clearAll();
+      await loadFromServer();
+      renderAll();
+      toast('已清空，重新开始吧','🧹');
+    }catch(e){ console.error(e); toast('清空失败，请检查网络','⚠️'); }
   });
 }
-init();
+function showGate(){ el('gate').style.display='flex'; }
+function hideGate(){ el('gate').style.display='none'; }
+async function bootstrap(){
+  if(!supabase){
+    showGate();
+    el('gateErr').textContent='Supabase 组件没加载成功：请检查网络能否访问 cdn.jsdelivr.net，然后刷新重试';
+    return;
+  }
+  try{
+    await loadFromServer();
+    init();
+    renderAll();
+    hideGate();
+    setupRealtime();
+  }catch(err){
+    console.error(err);
+    showGate();
+    const m=String((err&&err.message)||err||'');
+    if(/does not exist|relation|42P01|Could not find/i.test(m)){
+      el('gateErr').textContent='数据表还没建好：请到 Supabase 控制台 → SQL Editor 运行 supabase-setup.sql，再回来试';
+    }else if(/fetch|network|abort|timed out|ECONN|Failed to/i.test(m)){
+      el('gateErr').textContent='连不上云端服务器：请检查网络；若项目刚建，确认没有被 Supabase 暂停（Paused）';
+    }else{
+      el('gateErr').textContent='加载失败：'+m;
+    }
+  }
+}
+function setupRealtime(){
+  try{
+    supabase.channel('ledger-'+ledgerCode)
+      .on('postgres_changes',{event:'*',schema:'public',table:'records'},()=>{ refreshQuiet(); })
+      .on('postgres_changes',{event:'*',schema:'public',table:'budgets'},()=>{ refreshQuiet(); })
+      .subscribe();
+  }catch(e){ console.error(e); }
+}
+async function refreshQuiet(){ try{ await loadFromServer(); renderAll(); }catch(e){} }
+el('enterBtn').addEventListener('click',async()=>{
+  const code=el('codeInput').value.trim();
+  if(!code){ el('gateErr').textContent='请输入账本口令'; return; }
+  ledgerCode=code;
+  storage.set(LS_CODE,code);
+  el('gateErr').textContent='';
+  const btn=el('enterBtn');
+  btn.disabled=true; btn.textContent='正在进入…';
+  await bootstrap();
+  btn.disabled=false; btn.textContent='进入账本 →';
+});
+el('codeInput').addEventListener('keydown',e=>{ if(e.key==='Enter') el('enterBtn').click(); });
+el('switchBtn').addEventListener('click',()=>{
+  if(confirm('要切换账本吗？（云端数据不会丢，之后可用口令回来）')){
+    storage.remove(LS_CODE);
+    location.reload();
+  }
+});
+(function start(){
+  const saved=storage.get(LS_CODE);
+  if(saved){ ledgerCode=saved; hideGate(); bootstrap(); }
+  else showGate();
+})();
 </script>
 </body>
 </html>
