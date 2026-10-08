@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>🍓 小钱袋 · 双人记账本</title>
+<title>🍓 大钱袋 · 双人记账本</title>
 <link href="https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -162,7 +162,7 @@ body::before{content:'';position:fixed;top:0;left:0;right:0;height:8px;backgroun
 <body>
 <div id="gate" class="gate">
   <div class="gate-box">
-    <div class="gate-title">🍓 小钱袋 · 线上版</div>
+    <div class="gate-title">🍓 大钱袋 · 线上版</div>
     <div class="gate-sub">输入固定密码进入（密码存在文件里，两个人用同一个）</div>
     <input type="password" id="codeInput" placeholder="请输入密码" autocomplete="off">
     <button id="enterBtn">进入账本 →</button>
@@ -201,7 +201,7 @@ body::before{content:'';position:fixed;top:0;left:0;right:0;height:8px;backgroun
 </div>
 <div class="wrap">
   <header class="top">
-    <div class="title"><svg viewBox="0 0 200 200"><use href="#kitty"/></svg>小钱袋<span class="sub">小齐齐 &amp; 大刚刚 的可爱记账本</span></div>
+    <div class="title"><svg viewBox="0 0 200 200"><use href="#kitty"/></svg>大钱袋<span class="sub">小齐齐 &amp; 大刚刚 的可爱记账本</span></div>
     <div class="user-tabs">
       <button class="user-tab active" data-user="qiqi">🐰 小齐齐</button>
       <button class="user-tab" data-user="ganggang">🐻 大刚刚</button>
@@ -991,7 +991,7 @@ function init(){
     const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
     const a=document.createElement('a');
     a.href=URL.createObjectURL(blob);
-    a.download='小钱袋备份-'+dkey(new Date())+'.json';
+    a.download='大钱袋备份-'+dkey(new Date())+'.json';
     a.click();
     URL.revokeObjectURL(a.href);
     toast('数据已导出','📦');
