@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>🍓 大钱袋 · 双人记账本</title>
-<link href="https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
@@ -330,9 +329,9 @@ body::before{content:'';position:fixed;top:0;left:0;right:0;height:8px;backgroun
 <script>
 'use strict';
 /* ================= 账本配置（改这里就行） ================= */
-const USE_PASSWORD = false;                      // true=需要密码进入；false=不用密码，打开直接进账本
+const USE_PASSWORD = true;                      // true=需要密码进入；false=不用密码，打开直接进账本
 const FIXED_PASSWORD = '030200';                // 固定密码（仅 USE_PASSWORD=true 时生效）
-const FIXED_LEDGER_CODE = 'qiqi-ganggang-2026'; // 固定账本ID，云端数据都存这一个下面
+const FIXED_LEDGER_CODE = '齐齐和刚刚的小金库'; // 固定账本ID，云端数据都存这一个下面
 /* ======================================================== */
 const CATS=[
   {id:'food',name:'餐饮',emoji:'🍜',color:'#ff9f68'},
@@ -365,14 +364,14 @@ const CHEERS=[
 ];
 const LS_KEY='cuteLedger_v1';
 const LS_CODE='cuteLedger_online_code';
-const SUPABASE_URL='https://xoxqiuyiikqywuexhqgy.supabase.co';
-const SUPABASE_ANON_KEY='sb_publishable_YTT3-_WjTAej2eUGBNVkAA_0WQasRnR';
+const SUPABASE_URL='https://ymhohsqaoziudurbctzk.supabase.co';
+const SUPABASE_ANON_KEY='sb_publishable_SQP9J8VBFHlISEfHZHFn3Q_U-9T3QCY';
 function fetchWithTimeout(url,opts){
   opts=opts||{};
   const ctrl=('AbortController' in window)?new AbortController():null;
   if(ctrl&&!opts.signal){
     opts.signal=ctrl.signal;
-    const t=setTimeout(()=>ctrl.abort(),15000);
+    const t=setTimeout(()=>ctrl.abort(),10000);
     return fetch(url,opts).finally(()=>clearTimeout(t));
   }
   return fetch(url,opts);
@@ -488,12 +487,10 @@ function getBudget(uid,mk){
   if(uid==='both') return (state.qiqi.budgets[mk]||0)+(state.ganggang.budgets[mk]||0);
   return state[uid].budgets[mk]||0;
 }
-async function addRecord(uid,amount,cat,dateStr,type,note){
+function buildRecord(uid,amount,cat,dateStr,type,note){
   const now=new Date();
-  const row={
+  return {
     id:Date.now()+'-'+Math.random().toString(36).slice(2,7),
-    ledger_code:ledgerCode,
-    uid:uid,
     amount:Math.round(amount*100)/100,
     cat:CAT_MAP[cat]?cat:(type==='income'?'other_income':'other'),
     type:type==='income'?'income':'expense',
@@ -502,6 +499,9 @@ async function addRecord(uid,amount,cat,dateStr,type,note){
     note:String(note||'').trim().slice(0,50),
     ts:Date.now()
   };
+}
+async function addRecord(uid,rec){
+  const row=Object.assign({},rec,{ledger_code:ledgerCode,uid:uid});
   const {error}=await client.from('records').insert(row);
   if(error) throw error;
 }
@@ -932,11 +932,16 @@ function init(){
   }));
 
   el('addBtn').addEventListener('click',async()=>{
+    const btn=el('addBtn');
+    const setSaving=()=>{ btn.disabled=true; btn.textContent='保存中…'; };
+    const restore=()=>{ btn.disabled=false; btn.textContent=inputType==='income'?'记入收入 ✨':'记下这笔 ✨'; };
+
     if(editing){
       const amt=parseFloat(el('amountInput').value);
       if(!(amt>0)){ toast('先填一个正确的金额哦','🙈'); return; }
       const date=el('dateInput').value||dkey(new Date());
       const note=el('noteInput').value.trim();
+      setSaving();
       try{
         await updateRecord(editing.uid,editing.id,{
           amount:Math.round(amt*100)/100,
@@ -950,22 +955,34 @@ function init(){
         renderAll();
         toast('修改好啦','✏️');
       }catch(e){ console.error(e); toast('保存失败，请检查网络','⚠️'); }
+      restore();
       return;
     }
     if(currentUser==='both'){ toast('请先切换到小齐齐或大刚刚再记账哦','🙈'); return; }
+    const uid=currentUser, savedCat=selectedCat, savedType=inputType;
     const amt=parseFloat(el('amountInput').value);
     if(!(amt>0)){ toast('先填一个正确的金额哦','🙈'); return; }
     const date=el('dateInput').value||dkey(new Date());
     const note=el('noteInput').value.trim();
+    const rec=buildRecord(uid,amt,savedCat,date,savedType,note);
+
+    // 乐观更新：先在本地入账、立即渲染，后台再同步云端，慢网下也不再卡住
+    state[uid].records.push(rec);
+    el('amountInput').value='';
+    el('noteInput').value='';
+    renderAll();
+    setSaving();
     try{
-      await addRecord(currentUser,amt,selectedCat,date,inputType,note);
-      el('amountInput').value='';
-      el('noteInput').value='';
-      await loadFromServer();
+      await addRecord(uid,rec);
+      if(savedType==='income') toast('收入记好啦！'+CAT_MAP[savedCat].emoji+' +¥'+fmt(amt),'✅');
+      else toast('记好啦！'+CAT_MAP[savedCat].emoji+' ¥'+fmt(amt),'✅');
+    }catch(e){
+      console.error(e);
+      state[uid].records=state[uid].records.filter(x=>x.id!==rec.id);
       renderAll();
-      if(inputType==='income') toast('收入记好啦！'+CAT_MAP[selectedCat].emoji+' +¥'+fmt(amt),'✅');
-      else toast('记好啦！'+CAT_MAP[selectedCat].emoji+' ¥'+fmt(amt),'✅');
-    }catch(e){ console.error(e); toast('保存失败，请检查网络','⚠️'); }
+      toast('保存失败，请检查网络（这条已撤销）','⚠️');
+    }
+    restore();
   });
   el('editCancel').addEventListener('click',cancelEdit);
   el('amountInput').addEventListener('keydown',e=>{ if(e.key==='Enter') el('addBtn').click(); });
