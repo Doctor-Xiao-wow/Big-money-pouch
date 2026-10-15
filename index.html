@@ -330,7 +330,8 @@ body::before{content:'';position:fixed;top:0;left:0;right:0;height:8px;backgroun
 'use strict';
 /* ================= 账本配置（改这里就行） ================= */
 const USE_PASSWORD = true;                      // true=需要密码进入；false=不用密码，打开直接进账本
-const FIXED_PASSWORD = '030200';                // 固定密码（仅 USE_PASSWORD=true 时生效）
+const USER_PASSWORDS = { '030200':'qiqi', '100300':'ganggang' }; // 密码→用户：齐齐030200，刚刚100300
+const USERS = ['qiqi','ganggang'];               // 两位用户
 const FIXED_LEDGER_CODE = '齐齐和刚刚的小金库'; // 固定账本ID，云端数据都存这一个下面
 /* ======================================================== */
 const CATS=[
@@ -399,6 +400,7 @@ function round100(n){ return Math.max(100,Math.round(n/100)*100); }
 
 let state={qiqi:{records:[],budgets:{}},ganggang:{records:[],budgets:{}}};
 let ledgerCode=null;
+let loginUser=null;   // 当前登录的是谁（qiqi / ganggang）
 let currentUser='qiqi';
 let viewMode='month';
 let recordsMonth=mkey(new Date());
@@ -514,6 +516,7 @@ async function updateRecord(uid,id,patch){
   if(error) throw error;
 }
 function startEdit(uid,id){
+  if(!canEditUid(uid)){ toast('只能编辑自己的账单哦','🙈'); return; }
   const r=state[uid].records.find(x=>String(x.id)===String(id));
   if(!r) return;
   editing={uid:uid,id:String(id)};
@@ -543,14 +546,27 @@ function setBodyTheme(){
   document.body.classList.add('user-'+currentUser);
 }
 
+// 当前登录者只有在自己那一页才能写；看别人 / 两人合计页只能看
+function canWriteHere(){ return USE_PASSWORD ? (!!loginUser && currentUser===loginUser) : true; }
+// 某条记录是否属于当前登录者（决定能否改/删这一条）
+function canEditUid(uid){ return USE_PASSWORD ? (uid===loginUser) : true; }
+
 function renderCatGrid(){
   const list=inputType==='income'?INCATS:CATS;
   document.querySelectorAll('#typeTabs button').forEach(b=>b.classList.toggle('active',b.dataset.type===inputType));
-  el('addBtn').textContent=inputType==='income'?'记入收入 ✨':'记下这笔 ✨';
+  const locked=editing?false:!canWriteHere();
+  el('addBtn').textContent=editing?'保存修改 ✨':(locked?'只能看，不能改 🔒':(inputType==='income'?'记入收入 ✨':'记下这笔 ✨'));
+  el('addBtn').disabled=locked;
+  el('amountInput').disabled=locked;
+  el('noteInput').disabled=locked;
+  el('dateInput').disabled=locked;
   el('catGrid').innerHTML=list.map(c=>
     '<button class="cat-chip'+(c.id===selectedCat?' active':'')+'" data-cat="'+c.id+'" style="--cat:'+c.color+'">'+c.emoji+' '+c.name+'</button>'
   ).join('');
-  document.querySelectorAll('#catGrid .cat-chip').forEach(b=>b.addEventListener('click',()=>{ selectedCat=b.dataset.cat; renderCatGrid(); }));
+  document.querySelectorAll('#catGrid .cat-chip').forEach(b=>{
+    b.disabled=locked;
+    b.addEventListener('click',()=>{ selectedCat=b.dataset.cat; renderCatGrid(); });
+  });
 }
 
 function renderOverview(){
@@ -800,7 +816,7 @@ function renderAdvice(){
     +'<div class="advice-big">¥'+fmt(a.suggested)+'</div>'
     +'</div>'
     +a.tips.map(t=>'<div class="advice-tip"><span>'+t.emoji+'</span><span>'+t.text+'</span></div>').join('')
-    +(currentUser==='both'?'':'<div style="margin-top:12px"><button class="btn-secondary" id="applyBudget">🎯 应用到 '+nmLabel+' 预算</button></div>')
+    +(canWriteHere()?'<div style="margin-top:12px"><button class="btn-secondary" id="applyBudget">🎯 应用到 '+nmLabel+' 预算</button></div>':'')
     +'<div class="advice-cheer">'+a.cheer+'</div>';
   const ab=el('applyBudget');
   if(ab) ab.addEventListener('click',async()=>{
@@ -818,16 +834,19 @@ function renderBudget(){
   const b=getBudget(currentUser,budgetMonth);
   el('budgetInput').value=b||'';
   const info=el('budgetInfo');
+  const locked=currentUser==='both'||!canWriteHere();
   if(currentUser==='both'){
-    el('budgetInput').disabled=true; el('budgetBtn').disabled=true;
     info.textContent=b>0?'两人合计预算 ¥'+fmt(b)+'（请在小齐齐 / 大刚刚页面分别设置）':'两人合计预算 = 各自预算相加（请分别设置）';
+  }else if(locked){
+    info.textContent=b>0?'对方的预算 ¥'+fmt(b)+'（你只能看，不能改）':'对方还没有设置预算';
   }else{
-    el('budgetInput').disabled=false; el('budgetBtn').disabled=false;
     const total=monthExpense(currentUser,budgetMonth);
     info.textContent=b>0
       ?(total>0?(total>b?'该月已支出 ¥'+fmt(total)+'，超支 ¥'+fmt(total-b)+' 😱':'该月已支出 ¥'+fmt(total)+'，剩余 ¥'+fmt(b-total)+' 🎉'):'已设置预算 ¥'+fmt(b)+'，等待账单中…')
       :'还没有设置预算，设置后可以和实际支出对比哦～';
   }
+  el('budgetInput').disabled=locked;
+  el('budgetBtn').disabled=locked;
 }
 
 function renderRecords(){
@@ -850,7 +869,7 @@ function renderRecords(){
         +'<span class="rec-cat">'+c.emoji+' '+c.name+'</span>'
         +'<span class="rec-date">'+dt+'</span>'
         +'<span class="rec-amt'+(isInc?' rec-income':'')+'">'+(isInc?'+':'-')+'¥'+fmt(r.amount)+'</span>'
-        +'<button class="rec-del" data-id="'+esc(r.id)+'" data-uid="'+esc(r.uid)+'">✕</button></div>'
+        +(canEditUid(r.uid)?'<button class="rec-del" data-id="'+esc(r.id)+'" data-uid="'+esc(r.uid)+'">✕</button>':'')+'</div>'
         +note
         +'</div>';
     }).join('')
@@ -861,6 +880,7 @@ function renderRecords(){
   });
   document.querySelectorAll('#recList .rec-del').forEach(b=>b.addEventListener('click',async e=>{
     e.stopPropagation();
+    if(!canEditUid(b.dataset.uid)){ toast('只能删除自己的账单哦','🙈'); return; }
     if(confirm('要删掉这笔记录吗？')){
       try{
         await deleteRecord(b.dataset.uid,b.dataset.id);
@@ -904,6 +924,7 @@ function init(){
   el('dateInput').value=dkey(new Date());
   el('dateInput').max=dkey(new Date());
   setBodyTheme();
+  document.querySelectorAll('.user-tab').forEach(b=>b.classList.toggle('active',b.dataset.user===currentUser));
   updateClock();
   setInterval(updateClock,1000);
 
@@ -958,7 +979,8 @@ function init(){
       restore();
       return;
     }
-    if(currentUser==='both'){ toast('请先切换到小齐齐或大刚刚再记账哦','🙈'); return; }
+    if(currentUser==='both'){ toast('请先切换到自己的页面再记账哦','🙈'); return; }
+    if(!canWriteHere()){ toast('只能记自己的账，不能替对方记哦','🙈'); return; }
     const uid=currentUser, savedCat=selectedCat, savedType=inputType;
     const amt=parseFloat(el('amountInput').value);
     if(!(amt>0)){ toast('先填一个正确的金额哦','🙈'); return; }
@@ -988,7 +1010,8 @@ function init(){
   el('amountInput').addEventListener('keydown',e=>{ if(e.key==='Enter') el('addBtn').click(); });
 
   el('budgetBtn').addEventListener('click',async()=>{
-    if(currentUser==='both') return;
+    if(currentUser==='both'){ toast('请在个人页面设置预算','🙈'); return; }
+    if(!canWriteHere()){ toast('只能设置自己的预算哦','🙈'); return; }
     const v=parseFloat(el('budgetInput').value);
     if(!(v>=0)){ toast('请输入正确的预算金额','🙈'); return; }
     try{
@@ -1101,9 +1124,12 @@ async function refreshQuiet(){ try{ await loadFromServer(); renderAll(); }catch(
 el('enterBtn').addEventListener('click',async()=>{
   const pwd=el('codeInput').value.trim();
   if(!pwd){ el('gateErr').textContent='请输入密码'; return; }
-  if(pwd!==FIXED_PASSWORD){ el('gateErr').textContent='密码不对哦，再试一次'; return; }
+  const who=USER_PASSWORDS[pwd];
+  if(!who){ el('gateErr').textContent='密码不对哦，再试一次'; return; }
+  loginUser=who;
+  currentUser=who;
   ledgerCode=FIXED_LEDGER_CODE;
-  storage.set(LS_CODE,'ok');
+  storage.set(LS_CODE,who);
   el('gateErr').textContent='';
   const btn=el('enterBtn');
   btn.disabled=true; btn.textContent='正在进入…';
@@ -1125,7 +1151,8 @@ el('switchBtn').addEventListener('click',()=>{
     bootstrap();
     return;
   }
-  if(storage.get(LS_CODE)==='ok'){ ledgerCode=FIXED_LEDGER_CODE; hideGate(); bootstrap(); }
+  const saved=storage.get(LS_CODE);
+  if(USERS.indexOf(saved)>=0){ loginUser=saved; currentUser=saved; ledgerCode=FIXED_LEDGER_CODE; hideGate(); bootstrap(); }
   else showGate();
 })();
 </script>
