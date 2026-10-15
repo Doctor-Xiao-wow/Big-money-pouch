@@ -143,6 +143,7 @@ body::before{content:'';position:fixed;top:0;left:0;right:0;height:8px;backgroun
 .footer .note{font-size:11px;color:#c4b2ba;text-align:center;width:100%}
 #toast{position:fixed;left:50%;bottom:36px;transform:translateX(-50%) translateY(20px);background:#4a3c42;color:#fff;padding:12px 22px;border-radius:16px;font-size:14px;opacity:0;pointer-events:none;transition:all .3s;z-index:99;box-shadow:0 8px 24px rgba(0,0,0,.2);white-space:nowrap}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+#loadErr{display:none;max-width:1080px;margin:0 auto 16px;background:#fff0f0;border:2px solid #ff6b81;color:#c0392b;border-radius:16px;padding:12px 16px;font-size:14px;line-height:1.6;z-index:40}
 .floaties{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:-1}
 .floaties span{position:absolute;font-size:26px;opacity:.14;animation:floaty 9s ease-in-out infinite}
 .floaties svg{position:absolute;opacity:.12;animation:floaty 10s ease-in-out infinite}
@@ -200,6 +201,7 @@ body::before{content:'';position:fixed;top:0;left:0;right:0;height:8px;backgroun
   <span style="top:64%;left:48%;animation-delay:1.1s">🌸</span>
 </div>
 <div class="wrap">
+  <div id="loadErr"></div>
   <header class="top">
     <div class="title"><svg viewBox="0 0 200 200"><use href="#kitty"/></svg>大钱袋<span class="sub">小齐齐 &amp; 大刚刚 的可爱记账本</span></div>
     <div class="user-tabs">
@@ -1037,14 +1039,15 @@ function init(){
 function showGate(){ el('gate').style.display='flex'; }
 function hideGate(){ el('gate').style.display='none'; }
 async function bootstrap(){
+  init(); // 先接好所有按钮/标签页的点击事件，保证页面始终可点（即使数据加载失败也不会卡死）
   if(!supabase){
-    console.error('Supabase 组件没加载');
-    if(USE_PASSWORD){ showGate(); el('gateErr').textContent='Supabase 组件没加载成功：请检查网络能否访问 cdn.jsdelivr.net，然后刷新重试'; }
+    const m='Supabase 组件没加载成功：请检查网络能否访问 cdn.jsdelivr.net，然后刷新重试';
+    console.error(m);
+    showLoadError(m);
     return;
   }
   try{
     await loadFromServer();
-    init();
     renderAll();
     hideGate();
     setupRealtime();
@@ -1055,13 +1058,19 @@ async function bootstrap(){
     if(/does not exist|relation|42P01|Could not find/i.test(m)){
       msg='数据表还没建好：请到 Supabase 控制台 → SQL Editor 运行 supabase-setup.sql，再回来试';
     }else if(/fetch|network|abort|timed out|ECONN|Failed to/i.test(m)){
-      msg='连不上云端服务器：请检查网络；若项目刚建，确认没有被 Supabase 暂停（Paused）';
+      msg='连不上云端服务器：请确认 Supabase 项目仍存在（未删除/未暂停），并核对文件里的 SUPABASE_URL 是否正确；也可能是网络问题';
     }else{
       msg='加载失败：'+m;
     }
-    if(USE_PASSWORD){ showGate(); el('gateErr').textContent=msg; }
-    else { toast(msg,'⚠️'); }
+    showLoadError(msg);
   }
+}
+function showLoadError(msg){
+  renderAll();
+  const box=el('loadErr');
+  if(box){ box.style.display='block'; box.textContent='⚠️ '+msg; }
+  if(USE_PASSWORD){ showGate(); el('gateErr').textContent=msg; }
+  else { toast(msg,'⚠️'); }
 }
 function setupRealtime(){
   try{
