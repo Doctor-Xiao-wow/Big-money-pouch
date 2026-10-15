@@ -326,7 +326,7 @@ body::before{content:'';position:fixed;top:0;left:0;right:0;height:8px;backgroun
 </div>
 <div id="toast"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="./supabase.js"></script>
 <script>
 'use strict';
 /* ================= 账本配置（改这里就行） ================= */
@@ -1041,7 +1041,7 @@ function hideGate(){ el('gate').style.display='none'; }
 async function bootstrap(){
   init(); // 先接好所有按钮/标签页的点击事件，保证页面始终可点（即使数据加载失败也不会卡死）
   if(!supabase){
-    const m='Supabase 组件没加载成功：请检查网络能否访问 cdn.jsdelivr.net，然后刷新重试';
+    const m='Supabase 组件没加载成功：请确认 supabase.js 已和网页文件一起部署到同一目录，然后刷新重试';
     console.error(m);
     showLoadError(m);
     return;
