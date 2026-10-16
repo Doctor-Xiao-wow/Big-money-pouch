@@ -15,6 +15,7 @@
 }
 body.user-ganggang{ --accent:#4dabf7; --accent2:#8ec9ff; --accent-soft:#e3f2ff; --bg1:#eaf4ff; --bg2:#eefaff; --text:#2d5d8a; --muted:#85a8c8; }
 body.user-both{ --accent:#b28dff; --accent2:#d3bdff; --accent-soft:#f0eaff; --bg1:#f4efff; --bg2:#fdefff; --text:#5d4a8a; --muted:#9f8fc9; }
+body.user-settings{ --accent:#8a7aa8; --accent2:#b8a9d8; --accent-soft:#f0edf7; --bg1:#f2f0f8; --bg2:#faf9ff; --text:#5b5470; --muted:#9a92ad; }
 body{
   font-family:'ZCOOL KuaiLe','YouYuan','Yuanti SC','Microsoft YaHei','PingFang SC',sans-serif;
   background:
@@ -73,6 +74,9 @@ body::before{content:'';position:fixed;top:0;left:0;right:0;height:8px;backgroun
 .btn-secondary:hover{transform:scale(1.04)}
 .btn-secondary:disabled{opacity:.4;cursor:default;transform:none}
 .budget-info{margin-top:10px;font-size:13px;color:var(--muted)}
+.budget-who{font-size:14px;font-weight:700;white-space:nowrap;min-width:76px}
+.settings-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+.settings-actions .btn-ghost{flex:1;min-width:120px}
 .rec-list-row{}
 .rec-row{display:flex;flex-direction:column;padding:10px 8px;border-bottom:1px dashed var(--accent-soft);font-size:13px;cursor:pointer;border-radius:10px;transition:background .15s}
 .rec-row:hover{background:var(--accent-soft)}
@@ -105,6 +109,17 @@ body::before{content:'';position:fixed;top:0;left:0;right:0;height:8px;backgroun
 .ov-mini{display:flex;gap:18px;margin-top:10px;font-size:12px;color:var(--muted);flex-wrap:wrap}
 .ov-mini b{color:var(--text)}
 .ov-status{margin-top:14px;background:var(--accent-soft);border-radius:14px;padding:10px 14px;font-size:14px;font-weight:700}
+.cmp-table{width:100%;border-collapse:collapse;font-size:14px}
+.cmp-table th,.cmp-table td{padding:7px 6px;text-align:right;white-space:nowrap}
+.cmp-table th:first-child,.cmp-table td:first-child{text-align:left}
+.cmp-table th{color:var(--muted);font-weight:400;font-size:12px}
+.cmp-table tr.tot td{border-top:1px dashed var(--accent-soft);font-weight:700}
+.cmp-table td.neg{color:var(--danger)}
+.cmp-table td.pos{color:var(--income)}
+.cmp-cum-title{margin:14px 0 6px;font-size:13px;font-weight:700;color:var(--muted)}
+.rec-subtotal{font-size:12px;color:var(--muted);margin-top:2px}
+.rec-day{display:flex;align-items:center;gap:8px;margin:12px 0 2px;padding:5px 10px;background:var(--accent-soft);border-radius:10px;font-size:12px;font-weight:700;color:var(--text)}
+.rec-day-sub{margin-left:auto;font-weight:400;color:var(--muted);font-size:11px}
 .donut-wrap{display:flex;gap:18px;align-items:center;flex-wrap:wrap}
 .donut{width:170px;height:170px;border-radius:50%;position:relative;flex-shrink:0;background:#f0e6ea}
 .donut-hole{position:absolute;inset:24px;background:#fff;border-radius:50%}
@@ -207,12 +222,13 @@ body::before{content:'';position:fixed;top:0;left:0;right:0;height:8px;backgroun
       <button class="user-tab active" data-user="qiqi">🐰 小齐齐</button>
       <button class="user-tab" data-user="ganggang">🐻 大刚刚</button>
       <button class="user-tab" data-user="both">👫 两人合计</button>
+      <button class="user-tab" data-user="settings">⚙️ 设置</button>
     </div>
   </header>
 
-  <div class="grid">
+  <div class="grid" id="mainGrid">
     <div class="col">
-      <div class="card">
+      <div class="card" id="addCard">
         <h2 class="card-title">✏️ 记一笔</h2>
         <div class="seg-tabs" id="typeTabs">
           <button data-type="expense" class="active">💸 支出</button>
@@ -232,18 +248,6 @@ body::before{content:'';position:fixed;top:0;left:0;right:0;height:8px;backgroun
       </div>
 
       <div class="card">
-        <h2 class="card-title">🎯 每月预算</h2>
-        <div class="budget-nav">
-          <button id="budgetPrev">◀</button><span class="lbl" id="budgetMonthLabel"></span><button id="budgetNext">▶</button>
-        </div>
-        <div class="budget-row">
-          <input type="number" id="budgetInput" placeholder="输入预计消费，如 3000" min="0" step="0.01">
-          <button class="btn-secondary" id="budgetBtn">保存</button>
-        </div>
-        <div class="budget-info" id="budgetInfo"></div>
-      </div>
-
-      <div class="card">
         <h2 class="card-title">📒 账单明细</h2>
         <div class="rec-nav">
           <button id="prevMonth">◀</button><span class="lbl" id="recMonthLabel"></span><button id="nextMonth">▶</button>
@@ -254,33 +258,17 @@ body::before{content:'';position:fixed;top:0;left:0;right:0;height:8px;backgroun
     </div>
 
     <div class="col">
-      <div class="card">
-        <h2 class="card-title">📊 本月概览</h2>
-        <div class="ov-main">
-          <div class="ov-stat">
-            <div class="ov-label">本月支出</div>
-            <div class="ov-value" id="ovTotal">¥0.00</div>
-            <div class="ov-sub" id="ovDelta"></div>
-          </div>
-          <div class="ov-stat">
-            <div class="ov-label">本月收入</div>
-            <div class="ov-value ov-income" id="ovIncome">¥0.00</div>
-            <div class="ov-sub" id="ovIncomeSub"></div>
-          </div>
-          <div class="ov-stat">
-            <div class="ov-label">本月结余</div>
-            <div class="ov-value" id="ovBalance">¥0.00</div>
-            <div class="ov-sub">收入 − 支出</div>
-          </div>
+      <div class="card" id="cmpCard" style="display:none">
+        <h2 class="card-title">👫 两人对比</h2>
+        <div class="seg-tabs" id="cmpScopeTabs">
+          <button data-scope="today">📅 今日</button>
+          <button data-scope="month" class="active">🗓️ 本月</button>
+          <button data-scope="year">📆 今年</button>
         </div>
-        <div class="ov-progress">
-          <div class="ov-budget-line"><span id="ovBudgetText"></span><span id="ovLeftText"></span></div>
-          <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
-          <div class="ov-mini"><span>今日支出 <b id="ovToday">¥0.00</b></span><span>日均支出 <b id="ovDaily">¥0.00</b></span></div>
-        </div>
-        <div class="ov-status" id="ovStatus"></div>
+        <table class="cmp-table" id="cmpTable"></table>
+        <div class="cmp-cum-title">💰 累计（从记账以来）</div>
+        <table class="cmp-table" id="cmpCumTable"></table>
       </div>
-
       <div class="card">
         <h2 class="card-title" id="distTitle">🍩 消费分布</h2>
         <div class="seg-tabs" id="distTypeTabs">
@@ -298,28 +286,55 @@ body::before{content:'';position:fixed;top:0;left:0;right:0;height:8px;backgroun
     </div>
   </div>
 
-  <div class="card" style="margin-top:18px">
+  <div class="card" id="compareCard" style="margin-top:18px">
     <h2 class="card-title">📈 统计对比</h2>
-    <div class="seg-tabs" id="segTabs">
-      <button data-view="week" class="active">📅 周</button>
-      <button data-view="month">🗓️ 月</button>
-      <button data-view="year">📆 年</button>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+      <div class="seg-tabs" id="segTabs" style="margin-bottom:0">
+        <button data-view="week" class="active">📅 周</button>
+        <button data-view="month">🗓️ 月</button>
+        <button data-view="year">📆 年</button>
+      </div>
+      <div class="seg-tabs" id="cmpTypeTabs" style="margin-bottom:0">
+        <button data-cmp="expense" class="active">💸 支出</button>
+        <button data-cmp="income">💰 收入</button>
+        <button data-cmp="balance">⚖️ 结余</button>
+      </div>
     </div>
     <div class="bars" id="bars"></div>
     <div class="chart-note" id="chartNote"></div>
   </div>
 
-  <div class="card advice-card" style="margin-top:18px">
+  <div class="card advice-card" id="adviceCard" style="margin-top:18px">
     <h2 class="card-title">🔮 下个月消费建议</h2>
     <div id="adviceBody"></div>
   </div>
 
-  <footer class="footer">
-    <button id="exportBtn">📦 导出数据</button>
-    <button id="importBtn">📥 导入数据</button>
-    <button id="clearBtn">🧹 清空数据</button>
-    <button id="switchBtn">🔒 锁定</button>
+  <div class="card" id="settingsCard" style="margin-top:18px;display:none">
+    <h2 class="card-title">⚙️ 账本设置</h2>
+    <div class="budget-nav">
+      <button id="budgetPrev">◀</button><span class="lbl" id="budgetMonthLabel"></span><button id="budgetNext">▶</button>
+    </div>
+    <div class="budget-row">
+      <span class="budget-who">🐰 小齐齐</span>
+      <input type="number" id="budgetInputQiqi" placeholder="输入预计消费，如 3000" min="0" step="0.01">
+      <button class="btn-secondary" id="budgetBtnQiqi">保存</button>
+    </div>
+    <div class="budget-row" style="margin-top:8px">
+      <span class="budget-who">🐻 大刚刚</span>
+      <input type="number" id="budgetInputGanggang" placeholder="输入预计消费，如 3000" min="0" step="0.01">
+      <button class="btn-secondary" id="budgetBtnGanggang">保存</button>
+    </div>
+    <div class="budget-info" id="budgetInfo"></div>
+    <div class="settings-actions">
+      <button class="btn-ghost" id="exportBtn">📦 导出数据</button>
+      <button class="btn-ghost" id="importBtn">📥 导入数据</button>
+      <button class="btn-ghost" id="clearBtn">🧹 清空数据</button>
+      <button class="btn-ghost" id="switchBtn">🔒 退出登录</button>
+    </div>
     <input type="file" id="importInput" accept=".json" hidden>
+  </div>
+
+  <footer class="footer">
     <div class="note">数据实时同步到云端，两人各用各的设备记，账目自动合并；密码请保密哦～ 换设备不丢数据，仍建议定期「导出数据」备份</div>
   </footer>
 </div>
@@ -410,6 +425,10 @@ let selectedCat='food';
 let inputType='expense';
 let editing=null;
 let distType='expense';
+let cmpScope='month';
+let compareType='expense';
+let recordsExpanded=false;
+let settingsView=false;
 
 async function loadFromServer(){
   const [rr,br]=await Promise.all([
@@ -475,6 +494,9 @@ function monthIncome(uid,mk){ return userRecords(uid).filter(r=>isIncome(r)&&r.d
 function dayExpense(uid,dk){ return userRecords(uid).filter(r=>!isIncome(r)&&r.date===dk).reduce((s,r)=>s+r.amount,0); }
 function dayIncome(uid,dk){ return userRecords(uid).filter(r=>isIncome(r)&&r.date===dk).reduce((s,r)=>s+r.amount,0); }
 function yearExpense(uid,y){ return userRecords(uid).filter(r=>!isIncome(r)&&r.date.slice(0,4)===String(y)).reduce((s,r)=>s+r.amount,0); }
+function yearIncome(uid,y){ return userRecords(uid).filter(r=>isIncome(r)&&r.date.slice(0,4)===String(y)).reduce((s,r)=>s+r.amount,0); }
+function allExpense(uid){ return userRecords(uid).filter(r=>!isIncome(r)).reduce((s,r)=>s+r.amount,0); }
+function allIncome(uid){ return userRecords(uid).filter(r=>isIncome(r)).reduce((s,r)=>s+r.amount,0); }
 function monthByCat(uid,mk){
   const map={};
   userRecords(uid).filter(r=>!isIncome(r)&&r.date.slice(0,7)===mk).forEach(r=>{ map[r.cat]=(map[r.cat]||0)+r.amount; });
@@ -516,6 +538,7 @@ async function updateRecord(uid,id,patch){
   if(error) throw error;
 }
 function startEdit(uid,id){
+  if(currentUser==='both') return;  // 两人合计页只读，不进入编辑
   if(!canEditUid(uid)){ toast('只能编辑自己的账单哦','🙈'); return; }
   const r=state[uid].records.find(x=>String(x.id)===String(id));
   if(!r) return;
@@ -542,8 +565,15 @@ function cancelEdit(){
 }
 
 function setBodyTheme(){
-  document.body.classList.remove('user-qiqi','user-ganggang','user-both');
-  document.body.classList.add('user-'+currentUser);
+  document.body.classList.remove('user-qiqi','user-ganggang','user-both','user-settings');
+  document.body.classList.add(settingsView?'user-settings':'user-'+currentUser);
+}
+function applyView(){
+  const s=settingsView;
+  el('mainGrid').style.display=s?'none':'grid';
+  el('compareCard').style.display=s?'none':'block';
+  el('adviceCard').style.display=s?'none':'block';
+  el('settingsCard').style.display=s?'block':'none';
 }
 
 // 当前登录者只有在自己那一页才能写；看别人 / 两人合计页只能看
@@ -553,6 +583,7 @@ function canEditUid(uid){ return USE_PASSWORD ? (uid===loginUser) : true; }
 
 function renderCatGrid(){
   const list=inputType==='income'?INCATS:CATS;
+  el('addCard').style.display=currentUser==='both'?'none':'block';
   document.querySelectorAll('#typeTabs button').forEach(b=>b.classList.toggle('active',b.dataset.type===inputType));
   const locked=editing?false:!canWriteHere();
   el('addBtn').textContent=editing?'保存修改 ✨':(locked?'只能看，不能改 🔒':(inputType==='income'?'记入收入 ✨':'记下这笔 ✨'));
@@ -569,57 +600,27 @@ function renderCatGrid(){
   });
 }
 
-function renderOverview(){
-  const now=new Date(), mk=mkey(now), lk=mkey(addMonths(now,-1));
-  const total=monthExpense(currentUser,mk);
-  const last=monthExpense(currentUser,lk);
-  const income=monthIncome(currentUser,mk);
-  const lastInc=monthIncome(currentUser,lk);
-  const balance=income-total;
-  const budget=getBudget(currentUser,mk);
-  const today=dayExpense(currentUser,dkey(now));
-  const daily=total/Math.max(1,now.getDate());
-  el('ovTotal').textContent='¥'+fmt(total);
-  let sub='本月还没有记录';
-  if(total>0){
-    if(last>0){
-      const d=total-last;
-      sub='较上月 '+(d>=0?'↑':'↓')+' '+fmt(Math.abs(d))+'（'+(Math.abs(d)/last*100).toFixed(0)+'%）';
-    }else{
-      sub='上月无记录，这是本月第一笔';
+function renderCmp(){
+  const card=el('cmpCard');
+  if(currentUser!=='both'){ card.style.display='none'; return; }
+  card.style.display='block';
+  document.querySelectorAll('#cmpScopeTabs button').forEach(b=>b.classList.toggle('active',b.dataset.scope===cmpScope));
+  const now=new Date(), dk=dkey(now), mk=mkey(now), y=now.getFullYear();
+  function row(uid,name,isCum){
+    let exp,inc;
+    if(isCum){ exp=allExpense(uid); inc=allIncome(uid); }
+    else{
+      exp=cmpScope==='today'?dayExpense(uid,dk):(cmpScope==='year'?yearExpense(uid,y):monthExpense(uid,mk));
+      inc=cmpScope==='today'?dayIncome(uid,dk):(cmpScope==='year'?yearIncome(uid,y):monthIncome(uid,mk));
     }
+    const bal=inc-exp;
+    const cls=bal<0?'neg':(bal>0?'pos':'');
+    return '<tr'+(uid==='both'?' class="tot"':'')+'><td>'+name+'</td><td>−¥'+fmt(exp)+'</td><td>+¥'+fmt(inc)+'</td><td class="'+cls+'">'+fmt(bal)+'</td></tr>';
   }
-  el('ovDelta').textContent=sub;
-  el('ovIncome').textContent='¥'+fmt(income);
-  let isub='还没有收入记录';
-  if(income>0){
-    if(lastInc>0){
-      const d=income-lastInc;
-      isub='较上月 '+(d>=0?'↑':'↓')+' '+fmt(Math.abs(d))+'（'+(Math.abs(d)/lastInc*100).toFixed(0)+'%）';
-    }else{
-      isub='上月无收入，这是本月第一笔';
-    }
-  }
-  el('ovIncomeSub').textContent=isub;
-  const bal=el('ovBalance');
-  bal.textContent=(balance<0?'−':'')+'¥'+fmt(Math.abs(balance));
-  bal.classList.toggle('pos',balance>=0);
-  bal.classList.toggle('neg',balance<0);
-  const pct=budget>0?Math.min(100,total/budget*100):0;
-  const fill=el('progressFill');
-  fill.style.width=pct+'%';
-  fill.classList.toggle('over',budget>0&&total>budget);
-  el('ovBudgetText').textContent=budget>0?'预算 ¥'+fmt(budget):'未设置预算';
-  el('ovLeftText').textContent=budget>0?(total>budget?'已超支 ¥'+fmt(total-budget):'剩余 ¥'+fmt(budget-total)):'';
-  el('ovToday').textContent='¥'+fmt(today);
-  el('ovDaily').textContent='¥'+fmt(daily);
-  const st=el('ovStatus');
-  if(total===0&&income===0) st.textContent='🐣 本月还没有记账，快来记第一笔吧～';
-  else if(budget>0&&total>budget) st.textContent='😱 本月已经超支啦'+(balance<0?'，还入不敷出 ¥'+fmt(-balance):'')+'，下个月要加油控制哦！';
-  else if(budget>0) st.textContent='🎉 目前还在预算内，棒棒哒，继续保持！';
-  else if(income>0&&balance>=0) st.textContent='💰 本月结余 ¥'+fmt(balance)+'，攒钱小达人！';
-  else if(income>0&&balance<0) st.textContent='⚠️ 本月入不敷出 ¥'+fmt(-balance)+'，注意控制哦';
-  else st.textContent='💪 已记录 ¥'+fmt(total)+'，设置预算可以更好控制哦～';
+  el('cmpTable').innerHTML='<tr><th></th><th>支出</th><th>收入</th><th>结余</th></tr>'
+    +row('qiqi','🐰 小齐齐',false)+row('ganggang','🐻 大刚刚',false)+row('both','👫 合计',false);
+  el('cmpCumTable').innerHTML='<tr><th></th><th>累计支出</th><th>累计收入</th><th>累计结余</th></tr>'
+    +row('qiqi','🐰 小齐齐',true)+row('ganggang','🐻 大刚刚',true)+row('both','👫 合计',true);
 }
 
 function renderDonut(){
@@ -650,8 +651,20 @@ function renderDonut(){
     :'<div class="rec-empty">'+(distType==='expense'?'这个月还没有消费记录哦 🐣':'这个月还没有收入记录哦 🐣')+'</div>';
 }
 
+function cmpVal(uid,type,scope){
+  const exp=scope.dk?dayExpense(uid,scope.dk):(scope.mk?monthExpense(uid,scope.mk):yearExpense(uid,scope.y));
+  const inc=scope.dk?dayIncome(uid,scope.dk):(scope.mk?monthIncome(uid,scope.mk):yearIncome(uid,scope.y));
+  if(type==='income') return inc;
+  if(type==='balance') return inc-exp;
+  return exp;
+}
+function cmpBar(v,max,type){
+  const mag=type==='balance'?Math.abs(v):v;
+  return {h:mag>0?Math.max(mag/max*100,3):0, val:v!==0?fmtCompact(v):'', neg:type==='balance'&&v<0};
+}
 function renderCompare(){
   document.querySelectorAll('#segTabs button').forEach(b=>b.classList.toggle('active',b.dataset.view===viewMode));
+  document.querySelectorAll('#cmpTypeTabs button').forEach(b=>b.classList.toggle('active',b.dataset.cmp===compareType));
   if(viewMode==='week') renderWeek();
   else if(viewMode==='month') renderMonthBars();
   else renderYearBars();
@@ -661,21 +674,22 @@ function renderWeek(){
   const arr=[]; let total7=0;
   for(let i=6;i>=0;i--){
     const d=new Date(now.getFullYear(),now.getMonth(),now.getDate()-i);
-    const t=dayExpense(currentUser,dkey(d));
+    const t=cmpVal(currentUser,compareType,{dk:dkey(d)});
     arr.push({label:i===0?'今天':WEEKDAYS[d.getDay()],title:dkey(d),total:t});
     total7+=t;
   }
   let prev7=0;
   for(let i=13;i>=7;i--){
     const d=new Date(now.getFullYear(),now.getMonth(),now.getDate()-i);
-    prev7+=dayExpense(currentUser,dkey(d));
+    prev7+=cmpVal(currentUser,compareType,{dk:dkey(d)});
   }
-  const max=Math.max.apply(null,arr.map(x=>x.total).concat([1]));
+  const max=Math.max.apply(null,arr.map(x=>Math.abs(x.total)).concat([1]));
   el('bars').innerHTML=arr.map(x=>{
-    const h=x.total>0?Math.max(x.total/max*100,3):0;
-    return '<div class="bar-col" title="'+x.title+'：¥'+fmt(x.total)+'"><div class="bar-value">'+(x.total>0?fmtCompact(x.total):'')+'</div><div class="bar" style="height:'+h+'%"></div><div class="bar-label">'+x.label+'</div></div>';
+    const b=cmpBar(x.total,max,compareType);
+    return '<div class="bar-col" title="'+x.title+'：¥'+fmt(x.total)+'"><div class="bar-value">'+b.val+'</div><div class="bar'+(b.neg?' over':'')+'" style="height:'+b.h+'%"></div><div class="bar-label">'+x.label+'</div></div>';
   }).join('');
-  let note='近7天合计 <b>¥'+fmt(total7)+'</b>';
+  const tn=compareType==='income'?'收入':(compareType==='balance'?'结余':'支出');
+  let note='近7天'+tn+' <b>¥'+fmt(total7)+'</b>';
   if(prev7>0){
     const d=total7-prev7;
     note+=' · 较前7天 '+(d>=0?'↑':'↓')+' '+(Math.abs(d)/prev7*100).toFixed(0)+'%';
@@ -691,27 +705,32 @@ function renderMonthBars(){
     const d=addMonths(now,-i);
     months.push({mk:mkey(d),label:(d.getMonth()+1)+'月',isNow:i===0});
   }
-  months.forEach(m=>{ m.total=monthExpense(currentUser,m.mk); m.budget=getBudget(currentUser,m.mk); });
-  const max=Math.max.apply(null,months.map(m=>Math.max(m.total,m.budget)).concat([1]));
+  const isExp=compareType==='expense';
+  months.forEach(m=>{ m.total=cmpVal(currentUser,compareType,{mk:m.mk}); m.budget=isExp?getBudget(currentUser,m.mk):0; });
+  const max=Math.max.apply(null,months.map(m=>Math.max(Math.abs(m.total),m.budget)).concat([1]));
+  const tn=compareType==='income'?'收入':(compareType==='balance'?'结余':'支出');
   el('bars').innerHTML=months.map(m=>{
-    const h=m.total>0?Math.max(m.total/max*100,3):0;
-    const over=m.budget>0&&m.total>m.budget;
-    return '<div class="bar-col" title="'+m.mk+'：支出 ¥'+fmt(m.total)+(m.budget>0?' · 预算 ¥'+fmt(m.budget):'')+'">'
-      +'<div class="bar-value">'+(m.total>0?fmtCompact(m.total):'')+'</div>'
-      +'<div class="bar'+(over?' over':'')+'" style="height:'+h+'%"></div>'
+    const b=cmpBar(m.total,max,compareType);
+    const over=isExp&&m.budget>0&&m.total>m.budget;
+    return '<div class="bar-col" title="'+m.mk+'：'+tn+' ¥'+fmt(m.total)+(m.budget>0?' · 预算 ¥'+fmt(m.budget):'')+'">'
+      +'<div class="bar-value">'+b.val+'</div>'
+      +'<div class="bar'+((b.neg||over)?' over':'')+'" style="height:'+b.h+'%"></div>'
       +'<div class="bar-label"'+(m.isNow?' style="color:var(--accent);font-weight:700"':'')+'>'+m.label+'</div>'
       +(m.budget>0?'<div class="bar-budget">预 ¥'+fmtCompact(m.budget)+'</div>':'')
       +'</div>';
   }).join('');
-  const total=monthExpense(currentUser,mkey(now));
-  const last=monthExpense(currentUser,mkey(addMonths(now,-1)));
-  let note='本月支出 <b>¥'+fmt(total)+'</b>';
+  const total=cmpVal(currentUser,compareType,{mk:mkey(now)});
+  const last=cmpVal(currentUser,compareType,{mk:mkey(addMonths(now,-1))});
+  let note='本月'+tn+' <b>¥'+fmt(total)+'</b>';
   if(last>0){
     const d=total-last;
     note+=' · 较上月 '+(d>=0?'↑':'↓')+' '+(Math.abs(d)/last*100).toFixed(0)+'%';
   }
-  note+=' · 今年累计 <b>¥'+fmt(yearExpense(currentUser,now.getFullYear()))+'</b>';
-  note+=' <span>（红色柱 = 超预算）</span>';
+  const yInc=yearIncome(currentUser,now.getFullYear()), yExp=yearExpense(currentUser,now.getFullYear());
+  const yTot=compareType==='income'?yInc:(compareType==='balance'?yInc-yExp:yExp);
+  note+=' · 今年累计 <b>¥'+fmt(yTot)+'</b>';
+  if(isExp) note+=' <span>（红色柱 = 超预算）</span>';
+  else if(compareType==='balance') note+=' <span>（红色柱 = 结余为负）</span>';
   el('chartNote').innerHTML=note;
 }
 function renderYearBars(){
@@ -721,31 +740,37 @@ function renderYearBars(){
     if(years.indexOf(y)<0) years.push(y);
   });
   years.sort();
-  const rows=years.map(y=>({y:y,total:yearExpense(currentUser,+y)}));
+  const rows=years.map(y=>({y:y,total:cmpVal(currentUser,compareType,{y:+y})}));
   if(!rows.length){
     el('bars').innerHTML='<div class="rec-empty" style="width:100%">还没有跨年度的数据，先去记账吧 🐣</div>';
     el('chartNote').textContent='';
     return;
   }
-  const max=Math.max.apply(null,rows.map(r=>r.total).concat([1]));
+  const max=Math.max.apply(null,rows.map(r=>Math.abs(r.total)).concat([1]));
   el('bars').innerHTML=rows.map((r,i)=>{
-    const h=Math.max(r.total/max*100,3);
+    const b=cmpBar(r.total,max,compareType);
     let yoy='';
-    if(i>0&&rows[i-1].total>0){
+    if(compareType!=='balance'&&i>0&&rows[i-1].total>0){
       const d=r.total-rows[i-1].total;
       yoy='<div class="bar-budget">'+(d>=0?'↑':'↓')+(Math.abs(d)/rows[i-1].total*100).toFixed(0)+'%</div>';
     }
-    return '<div class="bar-col" title="'+r.y+'年：¥'+fmt(r.total)+'"><div class="bar-value">'+fmtCompact(r.total)+'</div><div class="bar" style="height:'+h+'%"></div><div class="bar-label">'+r.y+'年</div>'+yoy+'</div>';
+    return '<div class="bar-col" title="'+r.y+'年：¥'+fmt(r.total)+'"><div class="bar-value">'+b.val+'</div><div class="bar'+(b.neg?' over':'')+'" style="height:'+b.h+'%"></div><div class="bar-label">'+r.y+'年</div>'+yoy+'</div>';
   }).join('');
   const cur=rows[rows.length-1], prev=rows.length>1?rows[rows.length-2]:null;
-  let note='<b>'+cur.y+'</b>年至今支出 <b>¥'+fmt(cur.total)+'</b>';
-  if(prev&&prev.total>0){
+  const tn=compareType==='income'?'收入':(compareType==='balance'?'结余':'支出');
+  let note='<b>'+cur.y+'</b>年至今'+tn+' <b>¥'+fmt(cur.total)+'</b>';
+  if(prev&&prev.total>0&&compareType!=='balance'){
     const d=cur.total-prev.total;
     note+=' · 较'+prev.y+'年 '+(d>=0?'↑':'↓')+' '+(Math.abs(d)/prev.total*100).toFixed(0)+'%';
   }
   el('chartNote').innerHTML=note;
 }
 
+function pickCheer(uid){
+  const n=new Date();
+  const salt=uid==='qiqi'?0:(uid==='ganggang'?1:2);
+  return CHEERS[(n.getFullYear()*372+n.getMonth()*31+n.getDate()+salt)%CHEERS.length];
+}
 function genAdvice(uid){
   const now=new Date();
   const mk=mkey(now), lk=mkey(addMonths(now,-1)), l2k=mkey(addMonths(now,-2));
@@ -754,7 +779,7 @@ function genAdvice(uid){
   const budget=getBudget(uid,mk);
   const cats=monthByCat(uid,mk), lastCats=monthByCat(uid,lk);
   const name=uid==='both'?'两位':(uid==='qiqi'?'小齐齐':'大刚刚');
-  const cheer=CHEERS[Math.floor(Math.random()*CHEERS.length)];
+  const cheer=pickCheer(uid);
   if(total===0&&last===0&&income===0){
     const nb=getBudget(uid,mkey(addMonths(now,1)));
     return {suggested:nb>0?nb:2000,tips:[{emoji:'🐣',text:name+'还没有什么记账记录，先记几笔，下个月就能给出靠谱建议啦～'}],cheer:cheer};
@@ -831,22 +856,23 @@ function renderAdvice(){
 
 function renderBudget(){
   el('budgetMonthLabel').textContent=budgetMonth.replace('-','年')+'月';
-  const b=getBudget(currentUser,budgetMonth);
-  el('budgetInput').value=b||'';
+  const bq=getBudget('qiqi',budgetMonth), bg=getBudget('ganggang',budgetMonth);
+  const total=bq+bg;
+  el('budgetInputQiqi').value=bq||'';
+  el('budgetInputQiqi').disabled=!canEditUid('qiqi');
+  el('budgetBtnQiqi').disabled=!canEditUid('qiqi');
+  el('budgetInputGanggang').value=bg||'';
+  el('budgetInputGanggang').disabled=!canEditUid('ganggang');
+  el('budgetBtnGanggang').disabled=!canEditUid('ganggang');
   const info=el('budgetInfo');
-  const locked=currentUser==='both'||!canWriteHere();
-  if(currentUser==='both'){
-    info.textContent=b>0?'两人合计预算 ¥'+fmt(b)+'（请在小齐齐 / 大刚刚页面分别设置）':'两人合计预算 = 各自预算相加（请分别设置）';
-  }else if(locked){
-    info.textContent=b>0?'对方的预算 ¥'+fmt(b)+'（你只能看，不能改）':'对方还没有设置预算';
+  let txt;
+  if(total>0){
+    const exp=monthExpense('both',budgetMonth);
+    txt='两人合计预算 ¥'+fmt(total)+(exp>0?(exp>total?'，该月已支出 ¥'+fmt(exp)+'，超支 ¥'+fmt(exp-total)+' 😱':'，该月已支出 ¥'+fmt(exp)+'，剩余 ¥'+fmt(total-exp)+' 🎉'):'，等待账单中…');
   }else{
-    const total=monthExpense(currentUser,budgetMonth);
-    info.textContent=b>0
-      ?(total>0?(total>b?'该月已支出 ¥'+fmt(total)+'，超支 ¥'+fmt(total-b)+' 😱':'该月已支出 ¥'+fmt(total)+'，剩余 ¥'+fmt(b-total)+' 🎉'):'已设置预算 ¥'+fmt(b)+'，等待账单中…')
-      :'还没有设置预算，设置后可以和实际支出对比哦～';
+    txt='还没有设置预算，分别填写上面两人各自的预算并保存即可';
   }
-  el('budgetInput').disabled=locked;
-  el('budgetBtn').disabled=locked;
+  info.textContent=txt+'（输入 0 保存可清除该月预算）';
 }
 
 function renderRecords(){
@@ -857,24 +883,68 @@ function renderRecords(){
   const inc=recs.filter(isIncome).reduce((s,r)=>s+r.amount,0);
   const exp=recs.reduce((s,r)=>s+r.amount,0)-inc;
   const bal=inc-exp;
-  el('recList').innerHTML=recs.length?
-    recs.map(r=>{
+  let subHtml='';
+  if(currentUser==='both'){
+    ['qiqi','ganggang'].forEach(u=>{
+      const rs=recs.filter(r=>r.uid===u);
+      const i=rs.filter(isIncome).reduce((s,r)=>s+r.amount,0);
+      const e=rs.reduce((s,r)=>s+r.amount,0)-i;
+      subHtml+='<div class="rec-subtotal">'+(u==='qiqi'?'🐰 齐齐':'🐻 刚刚')+' 收入 <b style="color:var(--income)">+¥'+fmt(i)+'</b> · 支出 <b style="color:var(--danger)">−¥'+fmt(e)+'</b></div>';
+    });
+  }
+  const budget=getBudget(currentUser,recordsMonth);
+  const budgetTxt=budget>0
+    ?' · 预算 <b style="color:var(--accent)">¥'+fmt(budget)+'</b>'+(exp>budget?'，超支 <b style="color:var(--danger)">¥'+fmt(exp-budget)+'</b>':'，剩余 <b style="color:var(--income)">¥'+fmt(budget-exp)+'</b>')
+    :' · 未设预算';
+  // 默认折叠成一行摘要，点「展开」才显示按日分组的完整明细
+  if(!recordsExpanded){
+    el('recList').innerHTML=recs.length
+      ?'<div class="rec-total" style="text-align:left">共 '+recs.length+' 笔 · 收入 <b style="color:var(--income)">+¥'+fmt(inc)+'</b> · 支出 <b style="color:var(--danger)">−¥'+fmt(exp)+'</b> · 结余 <b style="color:'+(bal>=0?'var(--income)':'var(--danger)')+'">'+(bal<0?'−':'')+'¥'+fmt(Math.abs(bal))+'</b>'+budgetTxt+'</div>'
+        +'<button class="btn-ghost" id="recExpandBtn" style="width:100%;margin-top:8px">📜 展开账单明细（'+recs.length+' 笔）</button>'
+      :'<div class="rec-empty">这个月还没有账单哦 🐣</div>';
+    const eb=el('recExpandBtn');
+    if(eb) eb.addEventListener('click',()=>{ recordsExpanded=true; renderRecords(); });
+    return;
+  }
+
+  // 展开：按「日」分组渲染，每天一个日期标题（当天支出/收入）
+  const days=[];
+  recs.forEach(r=>{
+    const last=days[days.length-1];
+    if(!last||last.date!==r.date) days.push({date:r.date,list:[]});
+    days[days.length-1].list.push(r);
+  });
+  let body='';
+  days.forEach(d=>{
+    const p=d.date.split('-').map(Number);
+    const wd=WEEKDAYS[new Date(p[0],p[1]-1,p[2]).getDay()];
+    let de=0, di=0, nExp=0;
+    d.list.forEach(r=>{ if(isIncome(r)) di+=r.amount; else{ de+=r.amount; nExp++; } });
+    const parts=[];
+    if(nExp>0) parts.push(nExp+' 笔支出');
+    if(de>0) parts.push('支出 −¥'+fmt(de));
+    if(di>0) parts.push('收入 +¥'+fmt(di));
+    const sub=parts.join(' · ');
+    body+='<div class="rec-day"><span>'+p[1]+'月'+p[2]+'日 '+wd+'</span>'+(sub?'<span class="rec-day-sub">'+sub+'</span>':'')+'</div>';
+    d.list.forEach(r=>{
       const isInc=isIncome(r);
       const c=CAT_MAP[r.cat]||CAT_MAP[isInc?'other_income':'other'];
       const who=currentUser==='both'?'<span class="rec-user">'+(r.uid==='qiqi'?'🐰 齐齐':'🐻 刚刚')+'</span>':'';
-      const dt=esc(r.date.slice(5).replace('-','/')+(r.time?' '+r.time:''));
       const note=r.note?'<div class="rec-note">'+esc(r.note)+'</div>':'';
-      return '<div class="rec-row" data-id="'+esc(r.id)+'" data-uid="'+esc(r.uid)+'">'
+      body+='<div class="rec-row" data-id="'+esc(r.id)+'" data-uid="'+esc(r.uid)+'">'
         +'<div class="rec-main">'+who
         +'<span class="rec-cat">'+c.emoji+' '+c.name+'</span>'
-        +'<span class="rec-date">'+dt+'</span>'
+        +'<span class="rec-date">'+esc(r.time||'')+'</span>'
         +'<span class="rec-amt'+(isInc?' rec-income':'')+'">'+(isInc?'+':'-')+'¥'+fmt(r.amount)+'</span>'
-        +(canEditUid(r.uid)?'<button class="rec-del" data-id="'+esc(r.id)+'" data-uid="'+esc(r.uid)+'">✕</button>':'')+'</div>'
+        +((canEditUid(r.uid)&&currentUser!=='both')?'<button class="rec-del" data-id="'+esc(r.id)+'" data-uid="'+esc(r.uid)+'">✕</button>':'')+'</div>'
         +note
         +'</div>';
-    }).join('')
-    +'<div class="rec-total">收入 <b style="color:var(--income)">+¥'+fmt(inc)+'</b> · 支出 <b style="color:var(--danger)">−¥'+fmt(exp)+'</b> · 结余 <b style="color:'+(bal>=0?'var(--income)':'var(--danger)')+'">'+(bal<0?'−':'')+'¥'+fmt(Math.abs(bal))+'</b>（'+recs.length+' 笔）</div>'
-    :'<div class="rec-empty">这个月还没有账单哦 🐣</div>';
+    });
+  });
+  el('recList').innerHTML='<button class="btn-ghost" id="recCollapseBtn" style="width:100%;margin-bottom:8px">▴ 收起账单明细</button>'
+    +(recs.length?body+'<div class="rec-total">'+subHtml+'<div>收入 <b style="color:var(--income)">+¥'+fmt(inc)+'</b> · 支出 <b style="color:var(--danger)">−¥'+fmt(exp)+'</b> · 结余 <b style="color:'+(bal>=0?'var(--income)':'var(--danger)')+'">'+(bal<0?'−':'')+'¥'+fmt(Math.abs(bal))+'</b>（'+recs.length+' 笔）'+budgetTxt+'</div></div>':'<div class="rec-empty">这个月还没有账单哦 🐣</div>');
+  const cb=el('recCollapseBtn');
+  if(cb) cb.addEventListener('click',()=>{ recordsExpanded=false; renderRecords(); });
   document.querySelectorAll('#recList .rec-row').forEach(row=>{
     row.addEventListener('click',()=>startEdit(row.dataset.uid,row.dataset.id));
   });
@@ -903,13 +973,14 @@ function toast(text,emoji){
 
 function renderAll(){
   renderCatGrid();
-  renderOverview();
+  renderCmp();
   renderDonut();
   renderCompare();
   renderAdvice();
   renderBudget();
   renderRecords();
   if(editing){ el('addBtn').textContent='保存修改 ✨'; el('editCancel').style.display='inline-block'; }
+  applyView();
 }
 
 function updateClock(){
@@ -929,16 +1000,27 @@ function init(){
   setInterval(updateClock,1000);
 
   document.querySelectorAll('.user-tab').forEach(b=>b.addEventListener('click',()=>{
-    currentUser=b.dataset.user;
+    const u=b.dataset.user;
+    settingsView=(u==='settings');
+    if(!settingsView){ currentUser=u; if(editing) cancelEdit(); recordsExpanded=false; }
     document.querySelectorAll('.user-tab').forEach(x=>x.classList.toggle('active',x===b));
     setBodyTheme();
-    if(editing) cancelEdit();
     renderAll();
   }));
 
   document.querySelectorAll('#segTabs button').forEach(b=>b.addEventListener('click',()=>{
     viewMode=b.dataset.view;
     renderCompare();
+  }));
+
+  document.querySelectorAll('#cmpTypeTabs button').forEach(b=>b.addEventListener('click',()=>{
+    compareType=b.dataset.cmp;
+    renderCompare();
+  }));
+
+  document.querySelectorAll('#cmpScopeTabs button').forEach(b=>b.addEventListener('click',()=>{
+    cmpScope=b.dataset.scope;
+    renderCmp();
   }));
 
   document.querySelectorAll('#distTypeTabs button').forEach(b=>b.addEventListener('click',()=>{
@@ -1009,18 +1091,21 @@ function init(){
   el('editCancel').addEventListener('click',cancelEdit);
   el('amountInput').addEventListener('keydown',e=>{ if(e.key==='Enter') el('addBtn').click(); });
 
-  el('budgetBtn').addEventListener('click',async()=>{
-    if(currentUser==='both'){ toast('请在个人页面设置预算','🙈'); return; }
-    if(!canWriteHere()){ toast('只能设置自己的预算哦','🙈'); return; }
-    const v=parseFloat(el('budgetInput').value);
-    if(!(v>=0)){ toast('请输入正确的预算金额','🙈'); return; }
-    try{
-      if(v===0){ await clearBudget(currentUser,budgetMonth); toast('已清除该月预算','🧹'); }
-      else{ await setBudget(currentUser,budgetMonth,Math.round(v*100)/100); toast(budgetMonth.replace('-','年')+'月 预算已保存','🎯'); }
-      await loadFromServer();
-      renderAll();
-    }catch(e){ console.error(e); toast('保存失败，请检查网络','⚠️'); }
-  });
+  function bindBudget(uid,inputId,btnId){
+    el(btnId).addEventListener('click',async()=>{
+      if(!canEditUid(uid)){ toast('只能设置自己的预算哦','🙈'); return; }
+      const v=parseFloat(el(inputId).value);
+      if(!(v>=0)){ toast('请输入正确的预算金额','🙈'); return; }
+      try{
+        if(v===0){ await clearBudget(uid,budgetMonth); toast('已清除该月预算','🧹'); }
+        else{ await setBudget(uid,budgetMonth,Math.round(v*100)/100); toast(budgetMonth.replace('-','年')+'月 预算已保存','🎯'); }
+        await loadFromServer();
+        renderAll();
+      }catch(e){ console.error(e); toast('保存失败，请检查网络','⚠️'); }
+    });
+  }
+  bindBudget('qiqi','budgetInputQiqi','budgetBtnQiqi');
+  bindBudget('ganggang','budgetInputGanggang','budgetBtnGanggang');
 
   el('prevMonth').addEventListener('click',()=>{ recordsMonth=shiftMonthKey(recordsMonth,-1); renderRecords(); });
   el('nextMonth').addEventListener('click',()=>{ recordsMonth=shiftMonthKey(recordsMonth,1); renderRecords(); });
@@ -1138,7 +1223,7 @@ el('enterBtn').addEventListener('click',async()=>{
 });
 el('codeInput').addEventListener('keydown',e=>{ if(e.key==='Enter') el('enterBtn').click(); });
 el('switchBtn').addEventListener('click',()=>{
-  if(confirm('要锁定吗？（下次打开需要重新输入密码，云端数据不会丢）')){
+  if(confirm('要退出登录吗？（下次打开需要重新输入密码，云端数据不会丢）')){
     storage.remove(LS_CODE);
     location.reload();
   }
