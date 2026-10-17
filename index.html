@@ -120,6 +120,29 @@ body::before{content:'';position:fixed;top:0;left:0;right:0;height:8px;backgroun
 .rec-subtotal{font-size:12px;color:var(--muted);margin-top:2px}
 .rec-day{display:flex;align-items:center;gap:8px;margin:12px 0 2px;padding:5px 10px;background:var(--accent-soft);border-radius:10px;font-size:12px;font-weight:700;color:var(--text)}
 .rec-day-sub{margin-left:auto;font-weight:400;color:var(--muted);font-size:11px}
+.rec-summary{background:var(--accent-soft);border-radius:16px;padding:12px 16px;margin-bottom:12px;font-size:14px;line-height:2;color:var(--text)}
+.rec-summary b{font-weight:700}
+.day-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:2px}
+.day-title{font-weight:700}
+.day-back{border:none;background:#fff;color:var(--accent);padding:4px 10px;border-radius:10px;cursor:pointer;font-size:12px;font-family:inherit;white-space:nowrap}
+.day-back:hover{transform:scale(1.04)}
+.cal{margin-bottom:12px}
+.cal-head{display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:8px}
+.cal-head button{border:none;background:var(--accent-soft);color:var(--accent);width:28px;height:28px;border-radius:10px;cursor:pointer;font-weight:700;font-family:inherit}
+.cal-head button:hover{transform:scale(1.08)}
+.cal-head button:disabled{opacity:.35;cursor:default;transform:none}
+.cal-head .lbl{font-weight:700;font-size:15px}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.cal-wd{text-align:center;font-size:11px;color:var(--muted);padding:2px 0}
+.cal-day{border:1px solid transparent;background:transparent;border-radius:10px;padding:4px 2px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;cursor:pointer;font-family:inherit;min-height:46px;transition:background .15s}
+.cal-day:hover{background:var(--accent-soft)}
+.cal-day.empty{pointer-events:none}
+.cal-num{font-size:13px;color:var(--text);font-weight:600;line-height:1.2;width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:50%}
+.cal-day.today .cal-num{background:var(--accent);color:#fff}
+.cal-day.selected{background:var(--accent-soft);border-color:var(--accent)}
+.cal-sub{display:flex;flex-direction:column;align-items:center;max-width:100%;overflow:hidden;line-height:1.1}
+.cal-exp{font-size:9px;color:var(--danger);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cal-inc{font-size:9px;color:var(--income);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .donut-wrap{display:flex;gap:18px;align-items:center;flex-wrap:wrap}
 .donut{width:170px;height:170px;border-radius:50%;position:relative;flex-shrink:0;background:#f0e6ea}
 .donut-hole{position:absolute;inset:24px;background:#fff;border-radius:50%}
@@ -217,12 +240,12 @@ body::before{content:'';position:fixed;top:0;left:0;right:0;height:8px;backgroun
 <div class="wrap">
   <div id="loadErr"></div>
   <header class="top">
-    <div class="title"><svg viewBox="0 0 200 200"><use href="#kitty"/></svg>大钱袋<span class="sub">小齐齐 &amp; 大刚刚 的可爱记账本</span></div>
+    <div class="title"><svg viewBox="0 0 200 200"><use href="#kitty"/></svg>大钱袋<span class="sub">小齐齐 &amp; 大刚刚的记账本</span></div>
     <div class="user-tabs">
       <button class="user-tab active" data-user="qiqi">🐰 小齐齐</button>
       <button class="user-tab" data-user="ganggang">🐻 大刚刚</button>
       <button class="user-tab" data-user="both">👫 两人合计</button>
-      <button class="user-tab" data-user="settings">⚙️ 设置</button>
+      <button class="user-tab" data-user="settings">⚙️ 账本设置</button>
     </div>
   </header>
 
@@ -430,6 +453,7 @@ let distType='expense';
 let cmpScope='month';
 let compareType='expense';
 let recordsExpanded=false;
+let calDay=null;
 let settingsView=false;
 
 async function loadFromServer(){
@@ -877,6 +901,94 @@ function renderBudget(){
   info.textContent=txt+'（输入 0 保存可清除该月预算）';
 }
 
+function goRecordsMonth(delta){
+  recordsMonth=shiftMonthKey(recordsMonth,delta);
+  calDay=null;
+  renderRecords();
+}
+function monthSummaryHtml(cnt,inc,exp,bal,budget){
+  const curMk=mkey(new Date());
+  const name=recordsMonth===curMk?'本月账单':(parseInt(recordsMonth.slice(5),10)+'月账单');
+  const balCls=bal>=0?'var(--income)':'var(--danger)';
+  const balTxt=(bal<0?'−':'')+'¥'+fmt(Math.abs(bal));
+  let budgetLine;
+  if(budget>0){
+    const left=budget-exp;
+    const leftCls=left>=0?'var(--income)':'var(--danger)';
+    const leftTxt=(left<0?'−':'')+'¥'+fmt(Math.abs(left));
+    budgetLine='月预算 <b style="color:var(--accent)">¥'+fmt(budget)+'</b>，月剩余 <b style="color:'+leftCls+'">'+leftTxt+'</b>';
+  }else{
+    budgetLine='月预算 <b style="color:var(--muted)">未设置</b>';
+  }
+  return '<div class="rec-summary">'
+    +'<div>'+name+'共 '+cnt+' 笔，支出 <b style="color:var(--danger)">−¥'+fmt(exp)+'</b></div>'
+    +'<div>收入 <b style="color:var(--income)">+¥'+fmt(inc)+'</b>，结余 <b style="color:'+balCls+'">'+balTxt+'</b></div>'
+    +'<div>'+budgetLine+'</div>'
+    +'</div>';
+}
+function daySummaryHtml(){
+  const p=calDay.split('-').map(Number);
+  const wd=WEEKDAYS[new Date(p[0],p[1]-1,p[2]).getDay()];
+  const dayRecs=userRecords(currentUser).filter(r=>r.date===calDay);
+  const di=dayRecs.filter(isIncome).reduce((s,r)=>s+r.amount,0);
+  const de=dayRecs.reduce((s,r)=>s+r.amount,0)-di;
+  const nExp=dayRecs.filter(r=>!isIncome(r)).length;
+  const nInc=dayRecs.length-nExp;
+  return '<div class="rec-summary">'
+    +'<div class="day-head"><span class="day-title">📅 '+p[1]+'月'+p[2]+'日 '+wd+'</span><button type="button" class="day-back" id="calBackBtn">← 返回本月总结</button></div>'
+    +'<div>支出 <b style="color:var(--danger)">'+nExp+' 笔 : −¥'+fmt(de)+'</b>，收入 <b style="color:var(--income)">'+nInc+' 笔 : +¥'+fmt(di)+'</b></div>'
+    +'</div>';
+}
+function calendarHtml(recs){
+  const y=parseInt(recordsMonth.slice(0,4),10), m=parseInt(recordsMonth.slice(5,7),10);
+  const dayAgg={};
+  recs.forEach(r=>{
+    const d=r.date;
+    if(!dayAgg[d]) dayAgg[d]={exp:0,inc:0};
+    if(isIncome(r)) dayAgg[d].inc+=r.amount; else dayAgg[d].exp+=r.amount;
+  });
+  const first=new Date(y,m-1,1);
+  const startDow=first.getDay();
+  const daysInMonth=new Date(y,m,0).getDate();
+  const today=dkey(new Date());
+  const wdHead=['日','一','二','三','四','五','六'].map(w=>'<div class="cal-wd">'+w+'</div>').join('');
+  const cells=[];
+  for(let i=0;i<startDow;i++) cells.push('<div class="cal-day empty"></div>');
+  for(let d=1;d<=daysInMonth;d++){
+    const dk=y+'-'+pad(m)+'-'+pad(d);
+    const a=dayAgg[dk];
+    const cls=['cal-day'];
+    if(dk===today) cls.push('today');
+    if(dk===calDay) cls.push('selected');
+    let sub='';
+    if(a&&(a.exp>0||a.inc>0)){
+      sub='<span class="cal-sub">'
+        +(a.exp>0?'<span class="cal-exp">−'+fmtCompact(a.exp)+'</span>':'')
+        +(a.inc>0?'<span class="cal-inc">+'+fmtCompact(a.inc)+'</span>':'')
+        +'</span>';
+    }
+    cells.push('<button type="button" class="'+cls.join(' ')+'" data-day="'+dk+'"><span class="cal-num">'+d+'</span>'+sub+'</button>');
+  }
+  while(cells.length%7!==0) cells.push('<div class="cal-day empty"></div>');
+  return '<div class="cal">'
+    +'<div class="cal-head"><button type="button" id="calPrev">◀</button><span class="lbl">'+recordsMonth.replace('-','年')+'月</span><button type="button" id="calNext">▶</button></div>'
+    +'<div class="cal-grid">'+wdHead+cells.join('')+'</div>'
+    +'</div>';
+}
+function bindCalendar(){
+  const prev=el('calPrev'), next=el('calNext');
+  if(prev) prev.addEventListener('click',()=>goRecordsMonth(-1));
+  if(next){ next.disabled=recordsMonth>=mkey(new Date()); next.addEventListener('click',()=>goRecordsMonth(1)); }
+  const back=el('calBackBtn');
+  if(back) back.addEventListener('click',()=>{ calDay=null; renderRecords(); });
+  document.querySelectorAll('#recList .cal-day[data-day]').forEach(b=>{
+    b.addEventListener('click',()=>{
+      const d=b.dataset.day;
+      calDay=(calDay===d)?null:d;
+      renderRecords();
+    });
+  });
+}
 function renderRecords(){
   el('recMonthLabel').textContent=recordsMonth.replace('-','年')+'月';
   el('nextMonth').disabled=recordsMonth>=mkey(new Date());
@@ -898,12 +1010,15 @@ function renderRecords(){
   const budgetTxt=budget>0
     ?' · 预算 <b style="color:var(--accent)">¥'+fmt(budget)+'</b>'+(exp>budget?'，超支 <b style="color:var(--danger)">¥'+fmt(exp-budget)+'</b>':'，剩余 <b style="color:var(--income)">¥'+fmt(budget-exp)+'</b>')
     :' · 未设预算';
-  // 默认折叠成一行摘要，点「展开」才显示按日分组的完整明细
+  // 默认折叠：显示本月/当天总结 + 可点选日期的日历 + 展开按钮，点「展开」才显示按日分组的完整明细
   if(!recordsExpanded){
-    el('recList').innerHTML=recs.length
-      ?'<div class="rec-total" style="text-align:left">共 '+recs.length+' 笔 · 收入 <b style="color:var(--income)">+¥'+fmt(inc)+'</b> · 支出 <b style="color:var(--danger)">−¥'+fmt(exp)+'</b> · 结余 <b style="color:'+(bal>=0?'var(--income)':'var(--danger)')+'">'+(bal<0?'−':'')+'¥'+fmt(Math.abs(bal))+'</b>'+budgetTxt+'</div>'
-        +'<button class="btn-ghost" id="recExpandBtn" style="width:100%;margin-top:8px">📜 展开账单明细（'+recs.length+' 笔）</button>'
-      :'<div class="rec-empty">这个月还没有账单哦 🐣</div>';
+    if(calDay && calDay.slice(0,7)!==recordsMonth) calDay=null;
+    const summaryHtml=calDay?daySummaryHtml():monthSummaryHtml(recs.length,inc,exp,bal,budget);
+    el('recList').innerHTML=summaryHtml+calendarHtml(recs)
+      +(recs.length
+        ?'<button class="btn-ghost" id="recExpandBtn" style="width:100%;margin-top:8px">📜 展开账单明细（'+recs.length+' 笔）</button>'
+        :'<div class="rec-empty">这个月还没有账单哦 🐣</div>');
+    bindCalendar();
     const eb=el('recExpandBtn');
     if(eb) eb.addEventListener('click',()=>{ recordsExpanded=true; renderRecords(); });
     return;
@@ -1004,7 +1119,7 @@ function init(){
   document.querySelectorAll('.user-tab').forEach(b=>b.addEventListener('click',()=>{
     const u=b.dataset.user;
     settingsView=(u==='settings');
-    if(!settingsView){ currentUser=u; if(editing) cancelEdit(); recordsExpanded=false; }
+    if(!settingsView){ currentUser=u; if(editing) cancelEdit(); recordsExpanded=false; calDay=null; }
     document.querySelectorAll('.user-tab').forEach(x=>x.classList.toggle('active',x===b));
     setBodyTheme();
     renderAll();
@@ -1109,8 +1224,8 @@ function init(){
   bindBudget('qiqi','budgetInputQiqi','budgetBtnQiqi');
   bindBudget('ganggang','budgetInputGanggang','budgetBtnGanggang');
 
-  el('prevMonth').addEventListener('click',()=>{ recordsMonth=shiftMonthKey(recordsMonth,-1); renderRecords(); });
-  el('nextMonth').addEventListener('click',()=>{ recordsMonth=shiftMonthKey(recordsMonth,1); renderRecords(); });
+  el('prevMonth').addEventListener('click',()=>goRecordsMonth(-1));
+  el('nextMonth').addEventListener('click',()=>goRecordsMonth(1));
   el('budgetPrev').addEventListener('click',()=>{ budgetMonth=shiftMonthKey(budgetMonth,-1); renderBudget(); });
   el('budgetNext').addEventListener('click',()=>{ budgetMonth=shiftMonthKey(budgetMonth,1); renderBudget(); });
   el('distPrev').addEventListener('click',()=>{ distMonth=shiftMonthKey(distMonth,-1); renderDonut(); });
